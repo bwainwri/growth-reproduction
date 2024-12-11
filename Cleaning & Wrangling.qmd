@@ -6,28 +6,31 @@ editor: visual
 ---
 
 ## Background
-These data come from a common garden drought experiment in Davis, California investigating the functional trait strategies of California grassland plants from five different grassland communities spanning California's latitudinal precipitation gradient. There 10-12 species per community or provenance, each provenance has 16 plots (8 drought, 8 control) across 10 shelters (5 drought, 5 control). In the 2022-2023, we focused on collecting whole plant traits, inclduing reproductive investment. This study focuses on how these traits relate to reproductive investment depending on drought treatment, native status, or where the plant is from. This document will clean and wrangle the many datasets and images associated with this study. 
+
+These data come from a common garden drought experiment in Davis, California investigating the functional trait strategies of California grassland plants from five different grassland communities spanning California's latitudinal precipitation gradient. There 10-12 species per community or provenance, each provenance has 16 plots (8 drought, 8 control) across 10 shelters (5 drought, 5 control). In 2022-2023, we focused on collecting whole plant traits, including reproductive investment. This study focuses on how these traits relate to reproductive investment depending on drought treatment, native status, or provenance. This document will clean and wrangle the many datasets and images associated with this study.
 
 ## Traits & Objectives
-Reproductive allocation & End of Season biomass
-Relative Growth Rate
-Photosynthetic Rate
-Leaf Mass Area
-Leaf Area
-WUE
-Height
-Leaf Nitrogen
-Date of first flower
-Mid season biomass partial
-Root biomass partial
-Root:shoot ratio partial
-Root diameter partial
-Specific root length partial
-Root nitrogen partial
 
-Bring in, explore, clean, rectify outliers, organize each trait or group of traits and export as "..._CLEAN"
+- Reproductive allocation 
+- End of Season biomass 
+- Relative Growth Rate 
+- Photosynthetic Rate 
+- Leaf Mass Area 
+- Leaf Area 
+- WUE Height 
+- Leaf Nitrogen 
+- Date of first flower 
+- Mid season biomass partial 
+- Root biomass partial 
+- Root:shoot ratio partial 
+- Root diameter partial 
+- Specific root length partial 
+- Root nitrogen partial
+
+Bring in, explore, clean, rectify outliers, organize each trait or group of traits and export as "...\_CLEAN"
 
 ## Setup
+
 ```{r}
 #| message: false
 #| warning: false
@@ -41,9 +44,49 @@ library(ggplot2)
 
 ## Reproductive allocation & End of Season biomass
 
+These data are still being processed in the lab. There are many NAs that need to be verified using relative growth rate records.
+
+For now, read in what we have so far and create some preliminary figures and analyses.
+
+```{r}
+#| warning: false
+ra <- read_csv("Reproductive Allocation_202320241211.csv")
+str(ra)
+head(ra)
+
+ra <- ra %>% 
+  filter(!is.na(Collection_Date))
+
+# find rows with weird collection dates
+# if they are longer than 8 characters or contain "+" or "?"
+
+# determine average flower mass per speciesxpopulation and throw out outliers
+
+# see if there are treatment differences in single flower mass
+
+# find rows with missing flower masses, add relevant average
+
+
+```
+
 ## Relative Growth Rate
 
+```{r}
+rgr <- read_csv("Relative Growth Rate 2023 copy.csv")
+str(rgr)
+summary(rgr)
+head(rgr)
+
+```
+
 ## Photosynthetic Rate
+
+```{r}
+
+
+
+```
+
 
 ## Leaf Mass Area
 
@@ -68,4 +111,3 @@ library(ggplot2)
 ## Specific root length partial
 
 ## Root nitrogen partial
-
