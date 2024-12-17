@@ -51,9 +51,6 @@ For now, read in what we have so far and create some preliminary figures and ana
 ```{r}
 #| warning: false
 ## Read in Data
-
-```{r}
-getwd()
 repro <- read_csv("Reproductive Allocation_2023_DBS (do not use).csv")
 str(repro)
 summary(repro)
@@ -131,7 +128,7 @@ repro_full <- repro_full %>%
 
 ```{r}
 avg_fls <- repro_full %>% 
-  group_by(Species, Population, Treatment) %>% 
+  group_by(Sp_Code, Population, Treatment) %>% 
   summarise(avg_fl = mean(avg_fl_mass),
             stdev = sd(avg_fl_mass))
 ```
@@ -153,6 +150,8 @@ ggplot(repro_full, aes(x = Scientific_Name, y = RE)) +
 one.way <- aov(RE ~ Sp_Code, data = repro_full)
 summary(one.way)
 TukeyHSD(one.way)
+
+ggsave("RE_prelim_plot.jpg")
 ```
 
 ## Graph BROHOR, BRODIA, AVEBAR by population
@@ -176,6 +175,8 @@ one.way <- aov(RE ~ Population, data = repro_AVEBAR)
 summary(one.way)
 TukeyHSD(one.way)
 
+ggsave("RE_AVEBAR_prelim.jpg")
+
 repro_BRODIA <- repro_full[which(repro_full$Sp_Code == "BRODIA"),]
 
 ggplot(repro_BRODIA, aes(x = factor(Population, level = level_order), y = RE)) +
@@ -191,6 +192,7 @@ one.way <- aov(RE ~ Population, data = repro_BRODIA)
 summary(one.way)
 TukeyHSD(one.way)
 
+ggsave("RE_BRODIA_prelim.jpg")
 
 repro_BROHOR <- repro_full[which(repro_full$Sp_Code == "BROHOR"),]
 
@@ -207,6 +209,7 @@ one.way <- aov(RE ~ Population, data = repro_BROHOR)
 summary(one.way)
 TukeyHSD(one.way)
 
+ggsave("RE_BROHOR_prelim.jpg")
 ```
 
 ## Relative Growth Rate
