@@ -80,21 +80,20 @@ summary(repro_narm_cc$Veg_Mass)
 summary(repro_narm_cc$Flower_10_g)
 summary(repro_narm_cc$Flower_5_g)
 
-# Figure out how to average flower masses as long as at least Flower_1_g is entered. Come back and do this.
-
 repro_cc_ef <- repro_narm_cc %>% 
   mutate(avg_fl_mass = (Flower_1_g + Flower_2_g + Flower_3_g + Flower_4_g + Flower_5_g + Flower_6_g + Flower_7_g + Flower_8_g + Flower_9_g + Flower_10_g)/10) %>% 
   mutate(total_fl_mass = Flower_Count*avg_fl_mass) %>% 
   mutate(RE = total_fl_mass/(total_fl_mass + Veg_Mass))
 
 summary(repro_cc_ef)
-```
 
-## Join with keys
+# Figure out how to average flower masses as long as at least Flower_1_g is entered. Come back and do this.
 
-Bring in species names and Plot information including home community and drought treatment.
+repro_narm <- repro %>% 
+  drop_na(Flower_Count) %>% 
+  drop_na(Veg_Mass)
 
-```{r}
+
 plots <- read_csv("Plot_info copy.csv")
 str(plots)
 summary(plots)
@@ -102,15 +101,15 @@ head(plots)
 
 spp <- read_csv("Species Codes copy.csv")
 unique(spp$Sp_Code)
-unique(repro_cc_ef$Species)
+unique(repro$Species)
 
 # need to pull out first two characters in string of plant ID to create a "plot" column
 
-repro_cc_ef <- repro_cc_ef %>% 
+repro_narm <- repro_narm %>% 
   mutate(Plot = substr(Plant_ID, start = 1, stop = 2))
-unique(repro_cc_ef$Plot)
+unique(repro_narm$Plot)
 
-repro_full <- left_join(repro_cc_ef,plots,by = join_by(Plot))
+repro_full <- left_join(repro_narm,plots,by = join_by(Plot))
 
 repro_full$Sp_Code <- repro_full$Species
 
@@ -119,20 +118,76 @@ repro_full <- left_join(repro_full,spp,by = join_by(Sp_Code))
 repro_full <- repro_full %>% 
   select(
     Plant_ID,
-    Sp_Code,
+    Species,
     Scientific_Name,
-    Flower_Count,
-    Veg_Mass,
-    avg_fl_mass,
-    total_fl_mass,
-    RE,
+    Recorder,
+    Collection_Date,
+    Plot,
+    Block,
+    Shelter,
+    Plot_number,
     Population,
-    Treatment
+    Treatment,
+    Flower_Count,
+    Flower_1_g,
+    Flower_2_g,
+    Flower_3_g,
+    Flower_4_g,
+    Flower_5_g,
+    Flower_6_g,
+    Flower_7_g,
+    Flower_8_g,
+    Flower_9_g,
+    Flower_10_g,
+    Veg_Mass
   )
 
+# Coerce all AVEBAR from SEDG to be AVEFAT
+repro_full$Species[repro_full$Species == "AVEBAR" & repro_full$Population == "SEDG"] <- "AVEFAT"
+
+# check your work
+repro_full[which(repro_full$Population == "SEDG" & repro_full$Species == "AVEBAR"),]
+
+repro_full <-
+  repro_full %>%
+  mutate(fl_average = mean(c(Flower_1_g, 
+                             Flower_2_g, 
+                             Flower_3_g, 
+                             Flower_4_g,
+                             Flower_5_g,
+                             Flower_6_g,
+                             Flower_7_g,
+                             Flower_8_g,
+                             Flower_9_g,
+                             Flower_10_g), na.rm = TRUE))
+
+# check to make sure you have the right columns
+repro_full[,13:22]
+# Average flower masses for each individual
+repro_full$fl_average <- rowMeans(repro_full[,13:22], na.rm = TRUE)
+
+# Find the individuals with no flower mass
+no_fls <- repro_full[which(repro_full$fl_average == "NaN"),]
+no_fls <- no_fls[,1:23]
+repro_full <- repro_full[which(repro_full$fl_average != "NaN"),]
+
+avg_fls <- repro_full %>% 
+  group_by(Species, Population, Treatment) %>% 
+  summarise(fl_average = mean(fl_average, na.rm = TRUE))
+
+# mast avg fls onto no_fls and then re-merge no-fls with larger dataset
+rep_fls <- left_join(no_fls,avg_fls,by=join_by(Species,Population,Treatment))
+repro_fill <- rbind(rep_fls,repro_full)
+
+repro_fill$total_fl_mass <- repro_fill$Flower_Count*repro_fill$fl_average
+
+# There's an entry for ESCCAL which hasn't been done yet -- look into
+# Later you can remove any species with only one entry
 ```
 
-## Determine average flower mass per species per treatment
+## Join with keys
+
+## Find outliers
 
 ```{r}
 avg_fls <- repro_full %>% 
@@ -144,9 +199,6 @@ avg_fls <- repro_full %>%
 ## Graph RE by species
 
 ```{r}
-# Remove AVEFAT
-repro_full <- repro_full[-c(which(repro_full$Sp_Code == "AVEFAT")),]
-
 ggplot(repro_full, aes(x = Scientific_Name, y = RE)) +
   geom_boxplot() +
   # geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.5) + 
@@ -161,6 +213,7 @@ TukeyHSD(one.way)
 
 ggsave("RE_prelim_plot.jpg")
 ```
+
 ## Graph Allometry by Species
 
 Here, make a graph with vegetative biomass on the x-axis and reproductive biomass on the y-axis. Have each species be a different color with raw points on the graph, faded in color. Add a line for each species.
@@ -168,12 +221,8 @@ Here, make a graph with vegetative biomass on the x-axis and reproductive biomas
 Will need to go back and test nad remove outliers
 
 ```{r}
-# Remove AVEFAT
-repro_full <- repro_full[-c(which(repro_full$Sp_Code == "AVEFAT")),]
-head(repro_full)
-
-ggplot(repro_full, aes(x = Veg_Mass, y = total_fl_mass, color = Sp_Code)) +
-  geom_point(aes(x = Veg_Mass, y = total_fl_mass, color = Sp_Code)) +
+ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Species)) +
+  geom_point(aes(x = Veg_Mass, y = total_fl_mass, color = Species)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "Vegetative Biomass",
@@ -186,7 +235,7 @@ one.way <- aov(RE ~ Sp_Code, data = repro_full)
 summary(one.way)
 TukeyHSD(one.way)
 
-ggsave("RE_prelim_plot.jpg")
+ggsave("Allom_prelim_plot.jpg")
 ```
 
 
