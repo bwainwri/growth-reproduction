@@ -330,7 +330,6 @@ ggplot(repro_BROMAD, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
        y = "log(Reproductive Biomass (grams))") +
   theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
 
-
 ```
 
 
@@ -393,6 +392,11 @@ TukeyHSD(one.way)
 
 ggsave("RE_BROHOR_prelim.jpg")
 ```
+
+## Allometry by category
+
+Here, look into allometry relationships between native, invasive, non-native species
+
 
 ## Relative Growth Rate
 
