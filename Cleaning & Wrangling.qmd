@@ -40,6 +40,7 @@ library(readr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(viridis)
 ```
 
 ## Reproductive allocation & End of Season biomass
@@ -184,17 +185,22 @@ repro_fill$total_fl_mass <- repro_fill$Flower_Count*repro_fill$fl_average
 # There's an entry for ESCCAL which hasn't been done yet -- look into
 # Later you can remove any species with only one entry
 ```
+## Find outliers, use ratio of V to R
 
-## Join with keys
-
-## Find outliers
+Come back to this
 
 ```{r}
-avg_fls <- repro_full %>% 
-  group_by(Sp_Code, Population, Treatment) %>% 
-  summarise(avg_fl = mean(avg_fl_mass),
-            stdev = sd(avg_fl_mass))
+unique(repro_fill$Species)
+
+summary <- repro_fill %>% 
+  group_by(Species) %>% 
+  summarise(n = n()) %>% 
+  filter(n > 2)
+
+Sp_List <- summary$Species
+hist(repro_fill$Veg_Mass)
 ```
+
 
 ## Graph RE by species
 
@@ -231,12 +237,103 @@ ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Species)) +
 
 # Consider log -scaling to make more digestible
 
+ggsave("Allom_prelim_plot.jpg")
+```
+
+
+## Make a zoomed in plot
+
+```{r}
+ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Species)) +
+  geom_point(aes(x = Veg_Mass, y = total_fl_mass, color = Species)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  labs(x = "Vegetative Biomass",
+       y = "Reproductive Biomass") +
+  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1)) +
+  ylim(0,40) +
+  xlim(0,10)
+
+# Consider log -scaling to make more digestible
+
 one.way <- aov(RE ~ Sp_Code, data = repro_full)
 summary(one.way)
 TukeyHSD(one.way)
 
-ggsave("Allom_prelim_plot.jpg")
+ggsave("Allom_prelim_plot_zoom.jpg")
+
+
 ```
+
+## Make everything log scale
+
+```{r}
+repro_fill$Veg_Mass_ln <- log(repro_fill$Veg_Mass)
+repro_fill$total_fl_mass_ln <- log(repro_fill$total_fl_mass)
+
+# Remove ESCCAL, ACMPAR, HYPGLA, CAUCOU
+
+ggplot(repro_fill, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  labs(x = "log(Vegetative Biomass (grams))",
+       y = "log(Reproductive Biomass (grams))") +
+  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
+
+# Consider log -scaling to make more digestible
+
+ggsave("Allom_log_plot.jpg")
+```
+
+```{r}
+level_order <- c('ANGELO', 'MCL', 'BORR','SEDG','WWP')
+
+repro_AVEBAR <- repro_fill[which(repro_fill$Species == "AVEBAR"),]
+
+ggplot(repro_AVEBAR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  labs(x = "log(Vegetative Biomass (grams))",
+       y = "log(Reproductive Biomass (grams))") +
+  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
+
+repro_BRODIA <- repro_fill[which(repro_fill$Species == "BRODIA"),]
+
+ggplot(repro_BRODIA, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  labs(x = "log(Vegetative Biomass (grams))",
+       y = "log(Reproductive Biomass (grams))") +
+  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
+
+
+repro_BROHOR <- repro_fill[which(repro_fill$Species == "BROHOR"),]
+
+ggplot(repro_BROHOR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  labs(x = "log(Vegetative Biomass (grams))",
+       y = "log(Reproductive Biomass (grams))") +
+  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
+
+repro_BROMAD <- repro_fill[which(repro_fill$Species == "BROMAD"),]
+
+ggplot(repro_BROMAD, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  labs(x = "log(Vegetative Biomass (grams))",
+       y = "log(Reproductive Biomass (grams))") +
+  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
+
+
+```
+
+
 
 
 ## Graph BROHOR, BRODIA, AVEBAR by population
