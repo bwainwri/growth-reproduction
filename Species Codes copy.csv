@@ -1,11 +1,37 @@
-﻿Sp_Code,Scientific_Name
-AIRCAR,Aira caryophyllea
-AMSMEN,Amsinkia menziessii
-AVEBAR,Avena barbata
-BROARE,Bromus arenarius
-BRODIA,Bromus diandrus
-BROHOR,Bromus hordeaceus
-ACMPAR,Acmispon parviflorus
-AVEFAT,Avena fatua
-EROCIC,Erodium cicutarium
-VICSAT,Vicia sativa
+﻿Scientific_Name,Sp_Code,Native_Status,Growth_Habit,Perenniality
+Amsinckia menziesii,AMSMEN,Native,Forb,Annual
+Acmispon parviflorus,ACMPAR,Native ,Forb,Annual
+Aira caryophyllea,AIRCAR,Non-native,Grass,Annual
+Avena barbata,AVEBAR,Non-native,Grass,Annual
+Avena fatua,AVEFAT,Non-native,Grass,Annual
+Bromus diandrus,BRODIA,Non-native,Grass,Annual
+Bromus hordeaceaus,BROHOR,Non-native,Grass,Annual
+Bromus madritensis,BROMAD,Non-native,Grass,Annual
+Bromus arenarius,BROARE,Non-native,Grass,Annual
+Calindrinia menziesii,CALMEN,Native ,Forb,Annual
+Caulanthus coulteri,CAUCOU,Native ,Forb,Annual
+Centaurea melitensis,CENMEL,Non-native,Forb,Annual
+Clarkia purpurea,CLAPUR,Native ,Forb,Annual
+Corethrogyne filaginafolia,CORFIL,Native ,Forb,Perennial 
+Danthonia californica,DANCAL,Native ,Grass,Perennial 
+Daucus pusillus,DAUPUS,Native ,Forb,Annual
+Elymus caput-medusae,ELYCAP,Non-native,Grass,Annual
+Erodium botrys,EROBOT,Non-native,Forb,Annual
+Erodium cicutarium,EROCIC,Non-native,Forb,Annual
+Eschscholzia californica,ESCCAL,Native ,Forb,Perennial 
+Galium parisiense,GALPAR,Non-native,Forb,Annual
+Geranium dissectum,GERDIS,Non-native,Forb,Annual
+Holocarpha virgata,HOLVIR,Native ,Forb,Annual
+Hypochaeris glabra,HYPGLA,Non-native,Forb,Annual
+Lupinus bicolor,LUPBIC,Native ,Forb,Annual
+Lupinus microcarpus,LUPMIC,Native ,Forb,Annual
+Madia gracilis,MADGRA,Native ,Forb,Annual
+Micropus californicus,MICCAL,Native ,Forb,Annual
+Mirabilis multiflora,MIRMUL,Native ,Forb,Perennial 
+Phacelia tanacetifolia,PHATAN,Native ,Forb,Annual
+Plantago erecta,PLAERE,Native ,Forb,Annual
+Sanicula bipinnatifida,SANBIP,Native ,Forb,Perennial 
+Stipa pulchra,STIPUL,Native ,Grass,Perennial 
+Torilis arvensis,TORARV,Non-native,Forb,Annual
+Trifolium hirtum,TRIHIR,Non-native,Forb,Annual
+Vicia sativa,VICSAT,Non-native,Forb,Annual

@@ -71,23 +71,6 @@ head(repro)
 Remove rows that have NA in the Flower Count row and in the Veg Mass Row. For now, also drop rows that don't have any flower masses. Ultimately this should be a function but slow code it for now.
 
 ```{r}
-repro_narm_cc <- repro %>% 
-  drop_na(Flower_Count) %>% 
-  drop_na(Veg_Mass) %>% 
-  drop_na(Flower_1_g)
-
-summary(repro_narm_cc$Flower_Count)
-summary(repro_narm_cc$Veg_Mass)
-summary(repro_narm_cc$Flower_10_g)
-summary(repro_narm_cc$Flower_5_g)
-
-repro_cc_ef <- repro_narm_cc %>% 
-  mutate(avg_fl_mass = (Flower_1_g + Flower_2_g + Flower_3_g + Flower_4_g + Flower_5_g + Flower_6_g + Flower_7_g + Flower_8_g + Flower_9_g + Flower_10_g)/10) %>% 
-  mutate(total_fl_mass = Flower_Count*avg_fl_mass) %>% 
-  mutate(RE = total_fl_mass/(total_fl_mass + Veg_Mass))
-
-summary(repro_cc_ef)
-
 # Figure out how to average flower masses as long as at least Flower_1_g is entered. Come back and do this.
 
 repro_narm <- repro %>% 
@@ -119,8 +102,11 @@ repro_full <- left_join(repro_full,spp,by = join_by(Sp_Code))
 repro_full <- repro_full %>% 
   select(
     Plant_ID,
-    Species,
+    Sp_Code,
     Scientific_Name,
+    Native_Status,
+    Growth_Habit,
+    Perenniality,
     Recorder,
     Collection_Date,
     Plot,
@@ -144,10 +130,10 @@ repro_full <- repro_full %>%
   )
 
 # Coerce all AVEBAR from SEDG to be AVEFAT
-repro_full$Species[repro_full$Species == "AVEBAR" & repro_full$Population == "SEDG"] <- "AVEFAT"
+repro_full$Sp_Code[repro_full$Sp_Code == "AVEBAR" & repro_full$Population == "SEDG"] <- "AVEFAT"
 
 # check your work
-repro_full[which(repro_full$Population == "SEDG" & repro_full$Species == "AVEBAR"),]
+repro_full[which(repro_full$Population == "SEDG" & repro_full$Sp_Code == "AVEBAR"),]
 
 repro_full <-
   repro_full %>%
@@ -163,21 +149,22 @@ repro_full <-
                              Flower_10_g), na.rm = TRUE))
 
 # check to make sure you have the right columns
-repro_full[,13:22]
+repro_full[,16:25]
 # Average flower masses for each individual
-repro_full$fl_average <- rowMeans(repro_full[,13:22], na.rm = TRUE)
+repro_full$fl_average <- rowMeans(repro_full[,16:25], na.rm = TRUE)
 
 # Find the individuals with no flower mass
 no_fls <- repro_full[which(repro_full$fl_average == "NaN"),]
-no_fls <- no_fls[,1:23]
+#include everything except fl-Average
+no_fls <- no_fls[,1:26]
 repro_full <- repro_full[which(repro_full$fl_average != "NaN"),]
 
 avg_fls <- repro_full %>% 
-  group_by(Species, Population, Treatment) %>% 
+  group_by(Sp_Code, Population, Treatment) %>% 
   summarise(fl_average = mean(fl_average, na.rm = TRUE))
 
 # mast avg fls onto no_fls and then re-merge no-fls with larger dataset
-rep_fls <- left_join(no_fls,avg_fls,by=join_by(Species,Population,Treatment))
+rep_fls <- left_join(no_fls,avg_fls,by=join_by(Sp_Code,Population,Treatment))
 repro_fill <- rbind(rep_fls,repro_full)
 
 repro_fill$total_fl_mass <- repro_fill$Flower_Count*repro_fill$fl_average
@@ -190,34 +177,15 @@ repro_fill$total_fl_mass <- repro_fill$Flower_Count*repro_fill$fl_average
 Come back to this
 
 ```{r}
-unique(repro_fill$Species)
+unique(repro_fill$Sp_Code)
 
 summary <- repro_fill %>% 
-  group_by(Species) %>% 
+  group_by(Sp_Code) %>% 
   summarise(n = n()) %>% 
-  filter(n > 2)
+  filter(n < 3)
 
-Sp_List <- summary$Species
+Sp_List_small <- summary$Sp_Code
 hist(repro_fill$Veg_Mass)
-```
-
-
-## Graph RE by species
-
-```{r}
-ggplot(repro_full, aes(x = Scientific_Name, y = RE)) +
-  geom_boxplot() +
-  # geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.5) + 
-  theme_bw() +
-  labs(x = "Species",
-       y = "Reproductive Effort (R/R+V)") +
-  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
-
-one.way <- aov(RE ~ Sp_Code, data = repro_full)
-summary(one.way)
-TukeyHSD(one.way)
-
-ggsave("RE_prelim_plot.jpg")
 ```
 
 ## Graph Allometry by Species
@@ -227,42 +195,17 @@ Here, make a graph with vegetative biomass on the x-axis and reproductive biomas
 Will need to go back and test nad remove outliers
 
 ```{r}
-ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Species)) +
-  geom_point(aes(x = Veg_Mass, y = total_fl_mass, color = Species)) +
+ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Sp_Code)) +
+  geom_point(aes(x = Veg_Mass, y = total_fl_mass, color = Sp_Code)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "Vegetative Biomass",
        y = "Reproductive Biomass") +
-  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
+  theme(axis.text.x = element_text(size=9))
 
 # Consider log -scaling to make more digestible
 
 ggsave("Allom_prelim_plot.jpg")
-```
-
-
-## Make a zoomed in plot
-
-```{r}
-ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Species)) +
-  geom_point(aes(x = Veg_Mass, y = total_fl_mass, color = Species)) +
-  geom_smooth(method = "lm", fill = NA) +
-  theme_bw() +
-  labs(x = "Vegetative Biomass",
-       y = "Reproductive Biomass") +
-  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1)) +
-  ylim(0,40) +
-  xlim(0,10)
-
-# Consider log -scaling to make more digestible
-
-one.way <- aov(RE ~ Sp_Code, data = repro_full)
-summary(one.way)
-TukeyHSD(one.way)
-
-ggsave("Allom_prelim_plot_zoom.jpg")
-
-
 ```
 
 ## Make everything log scale
@@ -271,25 +214,34 @@ ggsave("Allom_prelim_plot_zoom.jpg")
 repro_fill$Veg_Mass_ln <- log(repro_fill$Veg_Mass)
 repro_fill$total_fl_mass_ln <- log(repro_fill$total_fl_mass)
 
-# Remove ESCCAL, ACMPAR, HYPGLA, CAUCOU
+# Remove species with less than 3 entries
+repro_fill_hi_n <- repro_fill[-(which(repro_fill$Sp_Code %in% c(Sp_List_small))),]
+unique(repro_fill_hi_n$Sp_Code)
 
-ggplot(repro_fill, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Sp_Code)) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "log(Vegetative Biomass (grams))",
        y = "log(Reproductive Biomass (grams))") +
-  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
+  theme(axis.text.x = element_text(size=9))
 
 # Consider log -scaling to make more digestible
 
 ggsave("Allom_log_plot.jpg")
 ```
 
+## Analysis and Diving Deeper
+
+- Look at Species from different populations
+- Compare Native v non-native species
+- Compare grasses and forbs
+- Use model comparison to detect whether growth habit, native status, or perenniality are the best predictors of reproductive allometry
+
 ```{r}
 level_order <- c('ANGELO', 'MCL', 'BORR','SEDG','WWP')
 
-repro_AVEBAR <- repro_fill[which(repro_fill$Species == "AVEBAR"),]
+repro_AVEBAR <- repro_fill[which(repro_fill$Sp_Code == "AVEBAR"),]
 
 ggplot(repro_AVEBAR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
@@ -299,7 +251,9 @@ ggplot(repro_AVEBAR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
        y = "log(Reproductive Biomass (grams))") +
   theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
 
-repro_BRODIA <- repro_fill[which(repro_fill$Species == "BRODIA"),]
+ggsave("Allom_log_plot_AVEBAR.jpg")
+
+repro_BRODIA <- repro_fill[which(repro_fill$Sp_Code == "BRODIA"),]
 
 ggplot(repro_BRODIA, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
@@ -309,8 +263,9 @@ ggplot(repro_BRODIA, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
        y = "log(Reproductive Biomass (grams))") +
   theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
 
+ggsave("Allom_log_plot_BRODIA.jpg")
 
-repro_BROHOR <- repro_fill[which(repro_fill$Species == "BROHOR"),]
+repro_BROHOR <- repro_fill[which(repro_fill$Sp_Code == "BROHOR"),]
 
 ggplot(repro_BROHOR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
@@ -320,7 +275,9 @@ ggplot(repro_BROHOR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
        y = "log(Reproductive Biomass (grams))") +
   theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
 
-repro_BROMAD <- repro_fill[which(repro_fill$Species == "BROMAD"),]
+ggsave("Allom_log_plot_BROHOR.jpg")
+
+repro_BROMAD <- repro_fill[which(repro_fill$Sp_Code == "BROMAD"),]
 
 ggplot(repro_BROMAD, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
@@ -330,73 +287,37 @@ ggplot(repro_BROMAD, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
        y = "log(Reproductive Biomass (grams))") +
   theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
 
+ggsave("Allom_log_plot_BROMAD.jpg")
+
 ```
 
-
-
-
-## Graph BROHOR, BRODIA, AVEBAR by population
+- Compare Native v non-native species
+- Compare grasses and forbs
+- Use model comparison to detect whether growth habit, native status, or perenniality are the best predictors of reproductive allometry
 
 ```{r}
-level_order <- c('ANGELO', 'MCL', 'BORR','SEDG','WWP')
-
-repro_AVEBAR <- repro_full[which(repro_full$Sp_Code == "AVEBAR"),]
-
-ggplot(repro_AVEBAR, aes(x = factor(Population, level = level_order), y = RE)) +
-  geom_boxplot() +
-  # geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.5) + 
+ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status)) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
-  labs(title = "Avena barbata",
-    x = "Provenance",
-       y = "Reproductive Effort (R/R+V)") +
-  theme(axis.text.x = element_text(face="bold", 
-                           size=10, angle=45, hjust = 1))
+  labs(x = "log(Vegetative Biomass (grams))",
+       y = "log(Reproductive Biomass (grams))") +
+  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
 
-one.way <- aov(RE ~ Population, data = repro_AVEBAR)
-summary(one.way)
-TukeyHSD(one.way)
-
-ggsave("RE_AVEBAR_prelim.jpg")
-
-repro_BRODIA <- repro_full[which(repro_full$Sp_Code == "BRODIA"),]
-
-ggplot(repro_BRODIA, aes(x = factor(Population, level = level_order), y = RE)) +
-  geom_boxplot() +
-  # geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.5) + 
-  theme_bw() +
-  labs(title = "Bromus diandrus",
-    x = "Provenance",
-       y = "Reproductive Effort (R/R+V)") +
-  theme(axis.text.x = element_text(face="bold", 
-                           size=10, angle=45, hjust = 1))
-one.way <- aov(RE ~ Population, data = repro_BRODIA)
-summary(one.way)
-TukeyHSD(one.way)
-
-ggsave("RE_BRODIA_prelim.jpg")
-
-repro_BROHOR <- repro_full[which(repro_full$Sp_Code == "BROHOR"),]
-
-ggplot(repro_BROHOR, aes(x = factor(Population, level = level_order), y = RE)) +
-  geom_boxplot() +
-  # geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.5) + 
-  theme_bw() +
-  labs(title = "Bromus hordeaceus",
-    x = "Provenance",
-       y = "Reproductive Effort (R/R+V)") +
-  theme(axis.text.x = element_text(face="bold", 
-                           size=10, angle=45, hjust = 1))
-one.way <- aov(RE ~ Population, data = repro_BROHOR)
-summary(one.way)
-TukeyHSD(one.way)
-
-ggsave("RE_BROHOR_prelim.jpg")
+ggsave("Allom_log_plot_Native.jpg")
 ```
 
-## Allometry by category
+```{r}
+ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit)) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  labs(x = "log(Vegetative Biomass (grams))",
+       y = "log(Reproductive Biomass (grams))") +
+  theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
 
-Here, look into allometry relationships between native, invasive, non-native species
-
+ggsave("Allom_log_plot_Growth.jpg")
+```
 
 ## Relative Growth Rate
 
