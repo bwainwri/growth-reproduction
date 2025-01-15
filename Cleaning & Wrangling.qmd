@@ -41,6 +41,7 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(viridis)
+library(lme4)
 ```
 
 ## Reproductive allocation & End of Season biomass
@@ -48,11 +49,16 @@ library(viridis)
 These data are still being processed in the lab. 
 
 Tasks:
+Stats for comparing lines
+Bold or dash native/invasive species in giant plot
+Jitter points in native or invasive plots
+Make populations colors the same
+Use viridis scale
+
 Determine outliers for veg mass and flower mass for each species
 Remove outliers
 Investigate outliers (when we're done)
-Figure out how to average flower mass with 1-9 flower weights
-Average flower masses per species and treatments, figure out how to apply those to individuals with no flower masses.
+
 
 For now, read in what we have so far and create some preliminary figures and analyses.
 
@@ -195,8 +201,8 @@ Here, make a graph with vegetative biomass on the x-axis and reproductive biomas
 Will need to go back and test nad remove outliers
 
 ```{r}
-ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Sp_Code)) +
-  geom_point(aes(x = Veg_Mass, y = total_fl_mass, color = Sp_Code)) +
+ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Scientific_Name)) +
+  geom_point(aes(x = Veg_Mass, y = total_fl_mass, color = Scientific_Name)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "Vegetative Biomass",
@@ -218,7 +224,8 @@ repro_fill$total_fl_mass_ln <- log(repro_fill$total_fl_mass)
 repro_fill_hi_n <- repro_fill[-(which(repro_fill$Sp_Code %in% c(Sp_List_small))),]
 unique(repro_fill_hi_n$Sp_Code)
 
-ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Sp_Code)) +
+ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name)) +
+  geom_abline(intercept = 0, slope = 1) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
@@ -229,6 +236,12 @@ ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Sp_Co
 # Consider log -scaling to make more digestible
 
 ggsave("Allom_log_plot.jpg")
+
+
+mod <- lmList(total_fl_mass_ln ~ Veg_Mass_ln | Sp_Code, data = repro_fill_hi_n)
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Sp_Code, data = repro_fill_hi_n))
+
 ```
 
 ## Analysis and Diving Deeper
@@ -244,7 +257,8 @@ level_order <- c('ANGELO', 'MCL', 'BORR','SEDG','WWP')
 repro_AVEBAR <- repro_fill[which(repro_fill$Sp_Code == "AVEBAR"),]
 
 ggplot(repro_AVEBAR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
-  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "log(Vegetative Biomass (grams))",
@@ -253,10 +267,14 @@ ggplot(repro_AVEBAR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 
 ggsave("Allom_log_plot_AVEBAR.jpg")
 
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_AVEBAR))
+
+
 repro_BRODIA <- repro_fill[which(repro_fill$Sp_Code == "BRODIA"),]
 
 ggplot(repro_BRODIA, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
-  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "log(Vegetative Biomass (grams))",
@@ -265,10 +283,13 @@ ggplot(repro_BRODIA, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 
 ggsave("Allom_log_plot_BRODIA.jpg")
 
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BRODIA))
+
 repro_BROHOR <- repro_fill[which(repro_fill$Sp_Code == "BROHOR"),]
 
 ggplot(repro_BROHOR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
-  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "log(Vegetative Biomass (grams))",
@@ -277,10 +298,13 @@ ggplot(repro_BROHOR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 
 ggsave("Allom_log_plot_BROHOR.jpg")
 
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BROHOR))
+
 repro_BROMAD <- repro_fill[which(repro_fill$Sp_Code == "BROMAD"),]
 
 ggplot(repro_BROMAD, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
-  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "log(Vegetative Biomass (grams))",
@@ -288,6 +312,8 @@ ggplot(repro_BROMAD, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
   theme(axis.text.x = element_text(size=9, angle=45, hjust = 1))
 
 ggsave("Allom_log_plot_BROMAD.jpg")
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BROMAD))
 
 ```
 
@@ -297,7 +323,8 @@ ggsave("Allom_log_plot_BROMAD.jpg")
 
 ```{r}
 ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status)) +
-  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "log(Vegetative Biomass (grams))",
@@ -309,7 +336,8 @@ ggsave("Allom_log_plot_Native.jpg")
 
 ```{r}
 ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit)) +
-  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit)) +
   geom_smooth(method = "lm", fill = NA) +
   theme_bw() +
   labs(x = "log(Vegetative Biomass (grams))",
