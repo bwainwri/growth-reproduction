@@ -262,7 +262,6 @@ SiteColors <-
   setNames(c(viridis(5)), levels(c('ANGELO', 'MCL', 'BORR','SEDG','WWP')))
 
 repro_AVEBAR <- repro_fill[which(repro_fill$Sp_Code == "AVEBAR"),]
-unique(repro_grasses$Population)
 
 repro_AVEBAR$Population <- factor(repro_AVEBAR$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
@@ -337,6 +336,8 @@ ggplot(repro_BROMAD, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 ggsave("Allom_log_plot_BROMAD.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BROMAD))
+
+write_csv(repro_fill, "repro_growth_intern.csv")
 
 ```
 
