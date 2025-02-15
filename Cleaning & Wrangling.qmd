@@ -72,7 +72,7 @@ head(repro)
 
 ```
 
-## Clean up and create variables
+### Clean up and create variables
 
 Remove rows that have NA in the Flower Count row and in the Veg Mass Row. For now, also drop rows that don't have any flower masses. Ultimately this should be a function but slow code it for now.
 
@@ -180,7 +180,7 @@ repro_fill$total_fl_mass <- repro_fill$Flower_Count*repro_fill$fl_average
 # There's an entry for ESCCAL which hasn't been done yet -- look into
 # Later you can remove any species with only one entry
 ```
-## Find outliers, use ratio of V to R
+### Find outliers, use ratio of V to R
 
 Come back to this
 
@@ -196,7 +196,7 @@ Sp_List_small <- summary$Sp_Code
 hist(repro_fill$Veg_Mass)
 ```
 
-## Graph Allometry by Species
+### Graph Allometry by Species
 
 Here, make a graph with vegetative biomass on the x-axis and reproductive biomass on the y-axis. Have each species be a different color with raw points on the graph, faded in color. Add a line for each species.
 
@@ -216,7 +216,7 @@ ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Scientific_Name)
 ggsave("Allom_prelim_plot.jpg")
 ```
 
-## Make everything log scale
+### Make everything log scale
 
 ```{r}
 repro_fill$Veg_Mass_ln <- log(repro_fill$Veg_Mass)
@@ -248,7 +248,7 @@ anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Sp_Code, data = repro_fill_hi_n))
 
 ```
 
-## Analysis and Diving Deeper
+### Analysis and Diving Deeper
 
 - Look at Species from different populations
 - Compare Native v non-native species
@@ -374,13 +374,66 @@ ggsave("Allom_log_plot_Pop.jpg")
 
 ## Relative Growth Rate
 
+### Clean up dataset
+
 ```{r}
 rgr <- read_csv("Relative Growth Rate 2023 copy.csv")
+plots <- read_csv("Plot_info copy.csv")
 str(rgr)
 summary(rgr)
 head(rgr)
+unique(rgr$Month)
+
+# All IDs from May and June are missing ".1" at the end
+# Extract species code from ID
+# Extract plot, shelter letter from ID, add in block and population
+rgr2 <- rgr %>% 
+  mutate(Plant_ID = if_else(Month == "May" | Month == "June", true = paste0(Plant_ID, ".1"), false = Plant_ID),
+         Sp_Code = substring(Plant_ID, 4,9),
+         Plot = substring(Plant_ID, 1,2),) %>% 
+  left_join(plots,by = join_by(Plot))
+
+unique(rgr2$Sp_Code)
+unique(rgr2$Shelter)
+unique(rgr2$Plot)
+
+# Find gaps, investigate
+# Could just keep complete cases
+# remove NAs for all four measurements
+# LEFT OFF HERE
+
+incomplete_rows <- rgr2[!complete.cases(rgr2), ]
+complete_rows
+
+# Find and investigate outliers
 
 ```
+
+### Create variables
+
+```{r}
+# Calculate canopy volume (height x canopy area)
+# Create variables
+## Feb-Mar leaf count
+## Feb-Mar Height
+## Feb-Mar Canopy volume
+## Mar-Apr leaf count
+## Mar-Apr Height
+## Mar-Apr Canopy volume
+## Apr-May leaf count
+## Apr-May Height
+## Apr-May Canopy volume
+## May-Jun leaf count
+## May-Jun Height
+## May-Jun Canopy volume
+
+```
+
+### Exploratory Graphs
+
+
+### Select Reference times
+One predictive variable of allometric slope might be relative growth rate timing and/or maximum relative growth rate.
 
 ## Photosynthetic Rate
 
