@@ -398,14 +398,60 @@ unique(rgr2$Shelter)
 unique(rgr2$Plot)
 
 # Find gaps, investigate
-# Could just keep complete cases
-# remove NAs for all four measurements
-# LEFT OFF HERE
+# Fixed, entering errors besides A1.ACMPAR in May which is missing leaf count
 
-incomplete_rows <- rgr2[!complete.cases(rgr2), ]
-complete_rows
+incomplete_rows <- rgr2[,c("Plant_ID","Month","Height_cm","Leaf_number","canopy_x","canopy_y")]
+incomplete_rows_2 <- incomplete_rows[!complete.cases(incomplete_rows),]
+incomplete_rows_2[rowSums(is.na(incomplete_rows_2)) < 4,] 
 
 # Find and investigate outliers
+# Good job for interns
+# Find average and standard deviation for each species, each growth variable (make area first), per population per month
+
+rgr2$area <- rgr2$canopy_x*rgr2$canopy_y
+
+rgr_avgs <- rgr2 %>% 
+  group_by(Sp_Code,
+           Month,
+           Population) %>% 
+  mutate(ht_avg = mean(Height_cm, na.rm = TRUE),
+            ht_sd = sd(Height_cm, na.rm = TRUE),
+            lf_avg = mean(Leaf_number, na.rm = TRUE),
+            lf_sd = sd(Leaf_number, na.rm = TRUE),
+            area_avg = mean(area, na.rm = TRUE),
+            area_sd = sd(area, na.rm = TRUE)) %>% 
+  select(Plant_ID,
+         Sp_Code,
+         Month,
+         Population,
+         Height_cm,
+         ht_avg,
+         ht_sd,
+         Leaf_number,
+         lf_avg,
+         lf_sd,
+         area,
+         area_avg,
+         area_sd)
+
+rgr_avgs <- rgr_avgs[complete.cases(rgr_avgs),]
+
+rgr_avgs <- rgr_avgs %>% 
+  mutate(ht_max = ht_avg + 3*ht_sd,
+         ht_min = ht_avg - 3*ht_sd,
+         lf_max = lf_avg + 3*lf_sd,
+         lf_min = lf_avg - 3*lf_sd,
+         area_max = area_avg + 3*area_sd,
+         area_min = area_avg - 3*area_sd)
+
+ht_outliers <- rgr_avgs[which(rgr_avgs$Height_cm > rgr_avgs$ht_max | rgr_avgs$Height_cm < rgr_avgs$ht_min),c("Plant_ID","Sp_Code","Month","Population", "Height_cm","ht_avg","ht_sd","ht_min","ht_max")]
+
+lf_outliers <- rgr_avgs[which(rgr_avgs$Leaf_number > rgr_avgs$lf_max | rgr_avgs$Leaf_number < rgr_avgs$lf_min),c("Plant_ID","Sp_Code","Month","Population", "Leaf_number","lf_avg","lf_sd","lf_min","lf_max")]
+
+area_outliers <- rgr_avgs[which(rgr_avgs$area > rgr_avgs$area_max | rgr_avgs$area < rgr_avgs$area_min),c("Plant_ID","Sp_Code","Month","Population", "area","area_avg","area_sd","area_min","area_max")]
+# Not super meaningful for investigating -- should make them for canopy x and y
+# LEFT OFF HERE
+
 
 ```
 
