@@ -419,7 +419,11 @@ rgr_avgs <- rgr2 %>%
             lf_avg = mean(Leaf_number, na.rm = TRUE),
             lf_sd = sd(Leaf_number, na.rm = TRUE),
             area_avg = mean(area, na.rm = TRUE),
-            area_sd = sd(area, na.rm = TRUE)) %>% 
+            area_sd = sd(area, na.rm = TRUE),
+            x_avg = mean(canopy_x, na.rm = TRUE),
+            x_sd = sd(canopy_x, na.rm = TRUE),
+            y_avg = mean(canopy_y, na.rm = TRUE),
+            y_sd = sd(canopy_y, na.rm = TRUE)) %>% 
   select(Plant_ID,
          Sp_Code,
          Month,
@@ -432,7 +436,13 @@ rgr_avgs <- rgr2 %>%
          lf_sd,
          area,
          area_avg,
-         area_sd)
+         area_sd,
+         canopy_x,
+         canopy_y,
+         x_avg,
+         x_sd,
+         y_avg,
+         y_sd)
 
 rgr_avgs <- rgr_avgs[complete.cases(rgr_avgs),]
 
@@ -442,24 +452,49 @@ rgr_avgs <- rgr_avgs %>%
          lf_max = lf_avg + 3*lf_sd,
          lf_min = lf_avg - 3*lf_sd,
          area_max = area_avg + 3*area_sd,
-         area_min = area_avg - 3*area_sd)
+         area_min = area_avg - 3*area_sd,
+         x_max = x_avg + 3*x_sd,
+         x_min = x_avg - 3*x_sd,
+         y_max = y_avg + 3*y_sd,
+         y_min = y_avg - 3*y_sd)
 
 ht_outliers <- rgr_avgs[which(rgr_avgs$Height_cm > rgr_avgs$ht_max | rgr_avgs$Height_cm < rgr_avgs$ht_min),c("Plant_ID","Sp_Code","Month","Population", "Height_cm","ht_avg","ht_sd","ht_min","ht_max")]
 
 lf_outliers <- rgr_avgs[which(rgr_avgs$Leaf_number > rgr_avgs$lf_max | rgr_avgs$Leaf_number < rgr_avgs$lf_min),c("Plant_ID","Sp_Code","Month","Population", "Leaf_number","lf_avg","lf_sd","lf_min","lf_max")]
 
 area_outliers <- rgr_avgs[which(rgr_avgs$area > rgr_avgs$area_max | rgr_avgs$area < rgr_avgs$area_min),c("Plant_ID","Sp_Code","Month","Population", "area","area_avg","area_sd","area_min","area_max")]
-# Not super meaningful for investigating -- should make them for canopy x and y
-# LEFT OFF HERE
 
+x_outliers <- rgr_avgs[which(rgr_avgs$canopy_x > rgr_avgs$x_max | rgr_avgs$canopy_x < rgr_avgs$x_min),c("Plant_ID","Sp_Code","Month","Population", "canopy_x","x_avg","x_sd","x_min","x_max")]
 
+y_outliers <- rgr_avgs[which(rgr_avgs$canopy_y > rgr_avgs$y_max | rgr_avgs$canopy_y < rgr_avgs$y_min),c("Plant_ID","Sp_Code","Month","Population", "canopy_y","y_avg","y_sd","y_min","y_max")]
+
+## Now go and investigate outliers using original data
 ```
 
 ### Create variables
 
 ```{r}
 # Calculate canopy volume (height x canopy area)
+head(rgr2)
+rgr2$volume <- rgr2$Height_cm*rgr2$canopy_x*rgr2$canopy_y
+
 # Create variables
+#RGR = (lnX2– lnX1)/(t2 – t1)
+
+?pivot_wider
+
+## LEFT OFF HERE
+
+rgr_wide <- rgr2 %>% 
+  pivot_wider()
+
+# pivot wider and add month to variable names
+rates_febmar <- rgr2 %>% 
+  filter(Month %in% c("February","March")) %>% 
+  group_by(Plant_ID) %>% 
+  summarise(febmar_lf = ,
+            febmar_ht = ,
+            febmar_vol = )
 ## Feb-Mar leaf count
 ## Feb-Mar Height
 ## Feb-Mar Canopy volume
