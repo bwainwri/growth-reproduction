@@ -392,6 +392,7 @@ rgr2 <- rgr %>%
          Sp_Code = substring(Plant_ID, 4,9),
          Plot = substring(Plant_ID, 1,2),) %>% 
   left_join(plots,by = join_by(Plot))
+str(rgr2)  
 
 unique(rgr2$Sp_Code)
 unique(rgr2$Shelter)
@@ -402,13 +403,13 @@ unique(rgr2$Plot)
 
 incomplete_rows <- rgr2[,c("Plant_ID","Month","Height_cm","Leaf_number","canopy_x","canopy_y")]
 incomplete_rows_2 <- incomplete_rows[!complete.cases(incomplete_rows),]
-incomplete_rows_2[rowSums(is.na(incomplete_rows_2)) < 4,] 
+incomplete_rows_2 <- incomplete_rows_2[rowSums(is.na(incomplete_rows_2)) < 4,] 
 
 # Find and investigate outliers
 # Good job for interns
 # Find average and standard deviation for each species, each growth variable (make area first), per population per month
-
-rgr2$area <- rgr2$canopy_x*rgr2$canopy_y
+str(rgr2)
+rgr2$area <- as.numeric(rgr2$canopy_x)*as.numeric(rgr2$canopy_y)
 
 rgr_avgs <- rgr2 %>% 
   group_by(Sp_Code,
@@ -477,37 +478,79 @@ y_outliers <- rgr_avgs[which(rgr_avgs$canopy_y > rgr_avgs$y_max | rgr_avgs$canop
 # Calculate canopy volume (height x canopy area)
 head(rgr2)
 rgr2$volume <- rgr2$Height_cm*rgr2$canopy_x*rgr2$canopy_y
+rgr2$Date <- as.Date(rgr2$Date, tryFormats = "%m/%d/%y")
+str(rgr2)
 
-# Create variables
-#RGR = (lnX2– lnX1)/(t2 – t1)
+# Separate by metric
 
-?pivot_wider
+rgr_h_wide <- rgr2 %>% 
+  select(Plant_ID,
+         Date,
+         Month,
+         Height_cm) %>% 
+  filter(!is.na(Height_cm)) %>%
+  pivot_wider(id_cols = Plant_ID,
+              names_from = Month,
+              values_from = c(Date, Height_cm)) %>% 
+  mutate(rgr_h_FM = (log(Height_cm_March)-log(Height_cm_February))/as.numeric((Date_March-Date_February)),
+         rgr_h_MA = (log(Height_cm_April)-log(Height_cm_March))/as.numeric((Date_April-Date_March)),
+         rgr_h_AM = (log(Height_cm_May)-log(Height_cm_April))/as.numeric((Date_May-Date_April)),
+         rgr_h_MJ = (log(Height_cm_June)-log(Height_cm_May))/as.numeric((Date_June-Date_May)))
 
-## LEFT OFF HERE
+rgr_l_wide <- rgr2 %>% 
+  select(Plant_ID,
+         Date,
+         Month,
+         Leaf_number) %>% 
+  filter(!is.na(Leaf_number)) %>%
+  pivot_wider(id_cols = Plant_ID,
+              names_from = Month,
+              values_from = c(Date, Leaf_number)) %>% 
+  mutate(rgr_l_FM = (log(Leaf_number_March)-log(Leaf_number_February))/as.numeric((Date_March-Date_February)),
+         rgr_l_MA = (log(Leaf_number_April)-log(Leaf_number_March))/as.numeric((Date_April-Date_March)),
+         rgr_l_AM = (log(Leaf_number_May)-log(Leaf_number_April))/as.numeric((Date_May-Date_April)),
+         rgr_l_MJ = (log(Leaf_number_June)-log(Leaf_number_May))/as.numeric((Date_June-Date_May)))
 
-rgr_wide <- rgr2 %>% 
-  pivot_wider()
+rgr_v_wide <- rgr2 %>% 
+  select(Plant_ID,
+         Date,
+         Month,
+         volume) %>% 
+  filter(!is.na(volume)) %>%
+  pivot_wider(id_cols = Plant_ID,
+              names_from = Month,
+              values_from = c(Date, volume)) %>% 
+  mutate(rgr_v_FM = (log(volume_March)-log(volume_February))/as.numeric((Date_March-Date_February)),
+         rgr_v_MA = (log(volume_April)-log(volume_March))/as.numeric((Date_April-Date_March)),
+         rgr_v_AM = (log(volume_May)-log(volume_April))/as.numeric((Date_May-Date_April)),
+         rgr_v_MJ = (log(volume_June)-log(volume_May))/as.numeric((Date_June-Date_May)))
+  
+# Join all three together but only keep rgrs, full join by Plant_ID
 
-# pivot wider and add month to variable names
-rates_febmar <- rgr2 %>% 
-  filter(Month %in% c("February","March")) %>% 
-  group_by(Plant_ID) %>% 
-  summarise(febmar_lf = ,
-            febmar_ht = ,
-            febmar_vol = )
-## Feb-Mar leaf count
-## Feb-Mar Height
-## Feb-Mar Canopy volume
-## Mar-Apr leaf count
-## Mar-Apr Height
-## Mar-Apr Canopy volume
-## Apr-May leaf count
-## Apr-May Height
-## Apr-May Canopy volume
-## May-Jun leaf count
-## May-Jun Height
-## May-Jun Canopy volume
+rgr_h_l <- full_join(rgr_h_wide,rgr_l_wide,by = join_by(Plant_ID))
 
+rgr_hlv <- full_join(rgr_h_l,rgr_v_wide,by = join_by(Plant_ID))
+
+rgr_hlv2 <- rgr_hlv %>% 
+  select(
+    Plant_ID,
+    rgr_h_FM,
+    rgr_h_MA,
+    rgr_h_AM,
+    rgr_h_MJ,
+    rgr_l_FM,
+    rgr_l_MA,
+    rgr_l_AM,
+    rgr_l_MJ,
+    rgr_v_FM,
+    rgr_v_MA,
+    rgr_v_AM,
+    rgr_v_MJ
+  )
+
+## Wooooo we did it!
+## Now just need to address outliers and re-run
+## Some values have -Inf, investigate that at some point. For now you're done!
 ```
 
 ### Exploratory Graphs
