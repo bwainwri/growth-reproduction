@@ -562,8 +562,12 @@ One predictive variable of allometric slope might be relative growth rate timing
 ## Photosynthetic Rate
 
 ```{r}
-
-
+# how to tell it the header and which rows to skip
+# how to read through the filenames in a certain folder and make a list and then read those in 1 by 1
+read_csv("2023-03-24-1201_BROARE_16.csv")
+read_csv("2023-04-01-0924_EROCIC_23_PHATAN_2.csv")
+read_csv("2023-04-03-0946_CALMEN_6_AMSMEN_7.csv")
+read_csv("2023-04-05-1004_AMSMEN_4_PHATAN_7_EROBOT_17.csv")
 
 ```
 
