@@ -42,6 +42,7 @@ library(tidyr)
 library(ggplot2)
 library(viridis)
 library(lme4)
+library(LeafArea)
 ```
 
 ## Reproductive allocation & End of Season biomass
@@ -564,10 +565,250 @@ One predictive variable of allometric slope might be relative growth rate timing
 ```{r}
 # how to tell it the header and which rows to skip
 # how to read through the filenames in a certain folder and make a list and then read those in 1 by 1
-read_csv("2023-03-24-1201_BROARE_16.csv")
-read_csv("2023-04-01-0924_EROCIC_23_PHATAN_2.csv")
-read_csv("2023-04-03-0946_CALMEN_6_AMSMEN_7.csv")
-read_csv("2023-04-05-1004_AMSMEN_4_PHATAN_7_EROBOT_17.csv")
+getwd()
+licor_files <- list.files("/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/licor")
+licor_files[4]
+?read_csv
+trial <- read_csv(licor_files[4], skip = 1, col_select = "obs":"gtc")
+
+lic <- list() # creates a list
+for (k in 1:length(licor_files)){
+ lic[[k]] <- read_csv(licor_files[k], skip = 1, col_select = "obs":"gtc")
+}
+
+lic <- lapply(lic, function(tbl) {
+  tbl$WUE <- as.numeric(tbl$WUE)
+  return(tbl)
+})
+
+licor <- bind_rows(lic)
+licor <- licor %>% 
+  filter(!is.na(obs))
+
+```
+
+Now I need to bring in Licor area csv and join. Also need to double check numbers for each species. Missing A2BROARE2_20230324.licor because saved incorrectly.
+
+GALPAR, Holvir, miccal not working
+
+```{r}
+getwd()
+amsmen = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/AMSMEN",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+amsmen<-amsmen$summary
+
+avebar = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/AVEBAR",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+avebar<-avebar$summary
+
+broare = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROARE",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+broare<-broare$summary
+
+brodia = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BRODIA",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+brodia<-brodia$summary
+
+brohor = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROHOR",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+brohor<-brohor$summary
+
+bromad = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROMAD",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+bromad<-bromad$summary
+
+calmen = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CALMEN",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+calmen<-calmen$summary
+
+caucou = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CAUCOU",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+caucou<-caucou$summary
+
+cenmel = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CENMEL",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+cenmel<-cenmel$summary
+
+clapur = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CLAPUR",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+clapur<-clapur$summary
+
+corfil = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CORFIL",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+corfil<-corfil$summary
+
+daupus = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/DAUPUS",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+daupus<-daupus$summary
+
+elycap = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/ELYCAP",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+elycap<-elycap$summary
+
+erobot = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/EROBOT",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+erobot<-erobot$summary
+
+erocic = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/EROCIC",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+erocic<-erocic$summary
+
+esccal = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/ESCCAL",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+esccal<-esccal$summary
+
+#### fix
+galpar = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/GALPAR", 
+                distance.pixel = 355, 
+                known.distance = 3, 
+                log = TRUE)
+galpar<-galpar$summary
+
+gerdis = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/GERDIS",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+gerdis<-gerdis$summary
+
+holvir = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/HOLVIR", 
+                distance.pixel = 355, 
+                known.distance = 3, 
+                log = TRUE)
+holvir<-holvir$summary
+
+hypgla = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/HYPGLA",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+hypgla<-hypgla$summary
+
+lupbic = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/LUPBIC",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+lupbic<-lupbic$summary
+
+lupmic = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/LUPMIC",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+lupmic<-lupmic$summary
+
+lupsuc = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/LUPSUC",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+lupsuc<-lupsuc$summary
+
+madgra = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/MADGRA",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+madgra<-madgra$summary
+
+miccal = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/MICCAL", 
+                distance.pixel = 355, 
+                known.distance = 3, 
+                log = TRUE)
+miccal<-miccal$summary
+
+phatan = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/PHATAN",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+phatan<-phatan$summary
+
+plaere = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/PLAERE",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+plaere<-plaere$summary
+
+stipul = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/STIPUL",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+stipul<-stipul$summary
+
+torarv = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/TORARV",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+torarv<-torarv$summary
+
+trihir = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/TRIHIR",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+trihir<-trihir$summary
+
+vicsat = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/VICSAT",
+              distance.pixel = 355,
+              known.distance = 3,
+              log = TRUE)
+vicsat<-vicsat$summary
+
+# missing galpar, miccal, holvir
+leaf_licor_area <- rbind(amsmen,
+                         avebar,
+                         broare,
+                         brodia,
+                         brohor,
+                         bromad,
+                         calmen,
+                         caucou,
+                         cenmel,
+                         clapur,
+                         corfil,
+                         daupus,
+                         elycap,
+                         erobot,
+                         erocic,
+                         esccal,
+                         gerdis,
+                         hypgla,
+                         lupbic,
+                         lupmic,
+                         lupsuc,
+                         madgra,
+                         phatan,
+                         plaere,
+                         stipul,
+                         torarv,
+                         trihir,
+                         vicsat)
 
 ```
 
