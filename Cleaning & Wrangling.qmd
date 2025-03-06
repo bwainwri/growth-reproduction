@@ -568,7 +568,7 @@ One predictive variable of allometric slope might be relative growth rate timing
 getwd()
 licor_files <- list.files("/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/licor")
 licor_files[4]
-?read_csv
+
 trial <- read_csv(licor_files[4], skip = 1, col_select = "obs":"gtc")
 
 lic <- list() # creates a list
@@ -587,7 +587,7 @@ licor <- licor %>%
 
 ```
 
-Now I need to bring in Licor area csv and join. Also need to double check numbers for each species. Missing A2BROARE2_20230324.licor because saved incorrectly.
+Now I need to bring in Licor leaf area csv and join. Also need to double check numbers for each species.
 
 GALPAR, Holvir, miccal not working
 
@@ -689,11 +689,13 @@ esccal = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projec
               log = TRUE)
 esccal<-esccal$summary
 
-#### fix
+
 galpar = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/GALPAR", 
                 distance.pixel = 355, 
-                known.distance = 3, 
+                known.distance = 3,
+                low.size = 0.005,
                 log = TRUE)
+          #      save.image = TRUE)
 galpar<-galpar$summary
 
 gerdis = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/GERDIS",
@@ -705,7 +707,9 @@ gerdis<-gerdis$summary
 holvir = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/HOLVIR", 
                 distance.pixel = 355, 
                 known.distance = 3, 
+                low.size = 0.005,
                 log = TRUE)
+                # save.image = TRUE)
 holvir<-holvir$summary
 
 hypgla = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/HYPGLA",
@@ -741,7 +745,9 @@ madgra<-madgra$summary
 miccal = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/MICCAL", 
                 distance.pixel = 355, 
                 known.distance = 3, 
+                low.size = 0.005,
                 log = TRUE)
+             #   save.image = TRUE)
 miccal<-miccal$summary
 
 phatan = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/PHATAN",
@@ -797,12 +803,15 @@ leaf_licor_area <- rbind(amsmen,
                          erobot,
                          erocic,
                          esccal,
+                         galpar,
                          gerdis,
+                         holvir,
                          hypgla,
                          lupbic,
                          lupmic,
                          lupsuc,
                          madgra,
+                         miccal,
                          phatan,
                          plaere,
                          stipul,
@@ -811,6 +820,22 @@ leaf_licor_area <- rbind(amsmen,
                          vicsat)
 
 ```
+
+Double check that the numbers of values per species aligns with number of images per species folder. Then merge with Licor dataset by plant ID.
+
+AVEBAR: missing 1
+BROHOR: missing 1
+BROMAD: missing 1
+CALMEN: missing 4
+CLAPUR: missing 2
+EROCIC: missing 2
+ESCCAL: missing 1
+LUPBIC: missing 5
+PLAERE: missing 1
+STIPUL: missing 14
+TRIHIR: missing 1
+VICSAT: missing 1
+
 
 ## Leaf Mass Area
 
