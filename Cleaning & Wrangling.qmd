@@ -602,7 +602,8 @@ amsmen<-amsmen$summary
 avebar = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/AVEBAR",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              save.image = TRUE)
 avebar<-avebar$summary
 
 broare = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROARE",
@@ -620,19 +621,22 @@ brodia<-brodia$summary
 brohor = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROHOR",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              save.image = TRUE)
 brohor<-brohor$summary
 
 bromad = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROMAD",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              save.image = TRUE)
 bromad<-bromad$summary
 
 calmen = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CALMEN",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              save.image = TRUE)
 calmen<-calmen$summary
 
 caucou = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CAUCOU",
@@ -824,10 +828,23 @@ leaf_licor_area <- rbind(amsmen,
 Double check that the numbers of values per species aligns with number of images per species folder. Then merge with Licor dataset by plant ID.
 
 AVEBAR: missing 1
+j4.AVEBAR.2 blank
+
 BROHOR: missing 1
+H5.BROHOR.2 ruler present
+
 BROMAD: missing 1
+B3.BROMAD.2 small
+
 CALMEN: missing 4
+A7.CALMEN.1 small
+B6.CALMEN.1 small
+C2.CALMEN.1 v small
+E6.CALMEN.1 small
+
 CLAPUR: missing 2
+LEFT OFF HERE
+
 EROCIC: missing 2
 ESCCAL: missing 1
 LUPBIC: missing 5
