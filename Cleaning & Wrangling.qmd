@@ -563,6 +563,8 @@ One predictive variable of allometric slope might be relative growth rate timing
 ## Photosynthetic Rate
 
 ```{r}
+#| warning: false
+
 # how to tell it the header and which rows to skip
 # how to read through the filenames in a certain folder and make a list and then read those in 1 by 1
 getwd()
@@ -589,10 +591,10 @@ licor <- licor %>%
 
 Now I need to bring in Licor leaf area csv and join. Also need to double check numbers for each species.
 
-GALPAR, Holvir, miccal not working
+GALPAR, Holvir, miccal not working -- fixed, just needed to adjust minimum size.
 
 ```{r}
-getwd()
+#| eval: false
 amsmen = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/AMSMEN",
               distance.pixel = 355,
               known.distance = 3,
@@ -602,8 +604,7 @@ amsmen<-amsmen$summary
 avebar = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/AVEBAR",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE,
-              save.image = TRUE)
+              log = TRUE)
 avebar<-avebar$summary
 
 broare = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROARE",
@@ -621,22 +622,21 @@ brodia<-brodia$summary
 brohor = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROHOR",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE,
-              save.image = TRUE)
+              log = TRUE)
 brohor<-brohor$summary
 
 bromad = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROMAD",
               distance.pixel = 355,
               known.distance = 3,
               log = TRUE,
-              save.image = TRUE)
+              low.size = 0.005)
 bromad<-bromad$summary
 
 calmen = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CALMEN",
               distance.pixel = 355,
               known.distance = 3,
               log = TRUE,
-              save.image = TRUE)
+              low.size = 0.005)
 calmen<-calmen$summary
 
 caucou = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CAUCOU",
@@ -654,7 +654,8 @@ cenmel<-cenmel$summary
 clapur = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CLAPUR",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              low.size = 0.005)
 clapur<-clapur$summary
 
 corfil = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/CORFIL",
@@ -684,13 +685,15 @@ erobot<-erobot$summary
 erocic = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/EROCIC",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              low.size = 0.005)
 erocic<-erocic$summary
 
 esccal = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/ESCCAL",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              low.size = 0.005)
 esccal<-esccal$summary
 
 
@@ -725,7 +728,8 @@ hypgla<-hypgla$summary
 lupbic = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/LUPBIC",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              low.size = 0.005)
 lupbic<-lupbic$summary
 
 lupmic = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/LUPMIC",
@@ -763,13 +767,15 @@ phatan<-phatan$summary
 plaere = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/PLAERE",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              low.size = 0.005)
 plaere<-plaere$summary
 
 stipul = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/STIPUL",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              low.size = 0.005)
 stipul<-stipul$summary
 
 torarv = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/TORARV",
@@ -781,7 +787,8 @@ torarv<-torarv$summary
 trihir = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/TRIHIR",
               distance.pixel = 355,
               known.distance = 3,
-              log = TRUE)
+              log = TRUE,
+              low.size = 0.005)
 trihir<-trihir$summary
 
 vicsat = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/VICSAT",
@@ -823,35 +830,35 @@ leaf_licor_area <- rbind(amsmen,
                          trihir,
                          vicsat)
 
+write_csv(leaf_licor_area, "leaf_licor_area.csv")
 ```
 
-Double check that the numbers of values per species aligns with number of images per species folder. Then merge with Licor dataset by plant ID.
+Double check that the numbers of values per species aligns with number of images per species folder. -- All good
 
-AVEBAR: missing 1
-j4.AVEBAR.2 blank
+Then merge with Licor dataset by plant ID.
 
-BROHOR: missing 1
-H5.BROHOR.2 ruler present
+```{r}
+# Separate date from plant ID, make in date format
+leaf_licor_area <- read_csv("leaf_licor_area.csv")
 
-BROMAD: missing 1
-B3.BROMAD.2 small
+# add periods to plant id
 
-CALMEN: missing 4
-A7.CALMEN.1 small
-B6.CALMEN.1 small
-C2.CALMEN.1 v small
-E6.CALMEN.1 small
+# capitalize Licor plant id
 
-CLAPUR: missing 2
-LEFT OFF HERE
+# extract species and plot form plant id
 
-EROCIC: missing 2
-ESCCAL: missing 1
-LUPBIC: missing 5
-PLAERE: missing 1
-STIPUL: missing 14
-TRIHIR: missing 1
-VICSAT: missing 1
+# remove licor data with gsw below threshold
+
+# test for licor outliers by species, population, and treatment
+
+# average licor data by plant_id
+
+# merge with licor leaf area
+
+# multiple focal data by leaf area fraction
+
+
+```
 
 
 ## Leaf Mass Area
