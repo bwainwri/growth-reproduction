@@ -43,7 +43,37 @@ library(ggplot2)
 library(viridis)
 library(lme4)
 library(LeafArea)
+library(mapdata)
+library(maps)
+
 ```
+
+## CA Map and Plant Comp
+
+Make a map of California with the inside of the boundary as a heat map of an aridity index. Then add five pie charts of plant composition.
+
+Can try to get climate data from: https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/county/mapping/4/pcp/189606/12/value
+
+```{r}
+
+plant_comp <- read_csv("USDA_Site Composition.csv")
+
+usa <- map_data("usa") # we already did this, but we can do it again
+ggplot() + 
+  geom_polygon(data = usa, aes(x = long, y = lat, group = group)) + 
+  coord_quickmap()
+
+states <- map_data("state")
+
+ca <- states %>%
+  filter(region == "california")
+
+ca_base <- ggplot(data = ca, mapping = aes(x = long, y = lat, group = group)) + 
+  coord_quickmap() + 
+  geom_polygon(color = "black", fill = "gray")
+ca_base + theme_void()
+```
+
 
 ## Reproductive allocation & End of Season biomass
 
