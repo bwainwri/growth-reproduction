@@ -73,6 +73,80 @@ ca_base <- ggplot(data = ca, mapping = aes(x = long, y = lat, group = group)) +
   geom_polygon(color = "black", fill = "gray")
 ca_base + theme_void()
 ```
+```{r}
+## Need the pie chart data to have the following columns: ID, Lat, Long, Sp1 proportion, Sp2 proportion, etc.
+
+# so we need to pivot wider the dataset and average across ten plots and add coordaintes for each site then use mapPies function
+
+str(plant_comp)
+
+# First average across ten plots
+comp_sum <- plant_comp %>%
+  filter(!Species == "Grass") %>% 
+  group_by(Site, Species) %>% 
+  summarise(avg_cov = mean(Percent_Cover, na.rm = TRUE))
+
+comp_sum$prop_cov <- comp_sum$avg_cov/100
+
+comp_sum <- comp_sum %>% 
+  group_by(Site) %>% 
+  mutate(prop_total = sum(prop_cov))
+
+comp_sum$prop_adj <- comp_sum$prop_cov/comp_sum$prop_total
+
+# check to make sure it worked
+comp_sum <- comp_sum %>% 
+  group_by(Site) %>% 
+  mutate(prop_adj_total = sum(prop_adj))
+?pivot_wider
+
+comp_wide <- comp_sum %>% 
+  select(Site,
+         Species,
+         prop_adj) %>% 
+  pivot_wider(names_from = Species,
+              values_from = prop_adj)
+
+# need to go back and rectify unknown species
+
+# add in lat and long for each site
+site_coord <- read_csv("site coord.csv")
+
+# practice adding them to the map
+
+ca_base <- ggplot(data = ca, mapping = aes(x = long, y = lat, group = group)) + 
+  geom_point(data = site_coord, aes(x = Lat, y = Long)) +
+  coord_quickmap() + 
+  geom_polygon(color = "black", fill = "gray")
+ca_base + theme_void()
+
+
+map_data <- 
+  base_world +
+  geom_point(data=cities, 
+             aes(x=Longitude, y=Latitude), colour="Deep Pink", 
+             fill="Pink",pch=21, size=5, alpha=I(0.7))
+
+map_data
+
+#Creat a base plot with gpplot2
+p <- ggplot() + coord_fixed() +
+  xlab("") + ylab("")
+
+#Add map to base plot
+base_ca_messy <- p + geom_polygon(data=ca, aes(x=long, y=lat, group=group), 
+                               colour="light green", fill="light green")
+
+map <- base_ca_messy + geom_point(data = site_coord,
+                                  aes(x=Lat, y=Long))
+map
+
+# Points are way off, it's probably wrong coordinate system
+
+?map_data
+
+
+```
 
 
 ## Reproductive allocation & End of Season biomass
