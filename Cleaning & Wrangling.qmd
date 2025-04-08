@@ -250,11 +250,10 @@ repro_full$Scientific_Name[repro_full$Sp_Code == "CALMEN"] <- "Calandrinia menzi
 repro_full[which(repro_full$Population == "SEDG" & repro_full$Sp_Code == "AVEBAR"),]
 ```
 ```{r}
-repro_intern <- repro_full
+repro_outliers <- repro_full
 
 # pivot longer flower masses and drop veg mass
-?pivot_longer
-repro_intern_2 <- repro_intern %>% 
+repro_outliers_2 <- repro_outliers %>% 
   pivot_longer(cols = c(Flower_1_g, 
                         Flower_2_g, 
                         Flower_3_g,
@@ -270,14 +269,53 @@ repro_intern_2 <- repro_intern %>%
   select(Plant_ID,
          Sp_Code,
          Scientific_Name,
+         Population,
          Flower,
-         Flower_Mass_g) %>% 
+         Flower_Mass_g,
+         Veg_Mass) %>% 
   filter(!is.na(Flower_Mass_g))
 
-write_csv(repro_intern_2, "repro_intern.csv")
+write_csv(repro_outliers_2, "repro_intern.csv")
+
+repro_avgs <- repro_outliers_2 %>% 
+  group_by(Sp_Code,
+           Population) %>% 
+  mutate(fl_avg = mean(Flower_Mass_g, na.rm = TRUE),
+            fl_sd = sd(Flower_Mass_g, na.rm = TRUE),
+            vg_avg = mean(Veg_Mass, na.rm = TRUE),
+            vg_sd = sd(Veg_Mass, na.rm = TRUE)) %>% 
+  select(Plant_ID,
+         Sp_Code,
+         Population,
+         Flower,
+         Flower_Mass_g,
+         fl_avg,
+         fl_sd,
+         Veg_Mass,
+         vg_avg,
+         vg_sd)
+
+repro_avgs <- repro_avgs[complete.cases(repro_avgs),]
+
+repro_avgs <- repro_avgs %>% 
+  mutate(fl_max = fl_avg + 3*fl_sd,
+         fl_min = fl_avg - 3*fl_sd,
+         vg_max = vg_avg + 3*vg_sd,
+         vg_min = vg_avg - 3*vg_sd)
+
+fl_outliers <- repro_avgs[which(repro_avgs$Flower_Mass_g > repro_avgs$fl_max | repro_avgs$Flower_Mass_g < repro_avgs$fl_min),c("Plant_ID","Sp_Code","Population", "Flower", "Flower_Mass_g","fl_avg","fl_sd","fl_min","fl_max")]
+
+vg_outliers <- repro_avgs[which(repro_avgs$Veg_Mass > repro_avgs$vg_max | repro_avgs$Veg_Mass < repro_avgs$vg_min),c("Plant_ID","Sp_Code","Population", "Veg_Mass","vg_avg","vg_sd","vg_min","vg_max")]
+
+vg_outliers <- vg_outliers[-which(duplicated(vg_outliers)),]
+
+
+write_csv(fl_outliers, "fl_outliers.csv")
+write_csv(vg_outliers, "vg_outliers.csv")
 ```
 
 ```{r}
+# need to find outliers before this
 repro_full <-
   repro_full %>%
   mutate(fl_average = mean(c(Flower_1_g, 
@@ -329,6 +367,14 @@ summary <- repro_fill %>%
 
 Sp_List_small <- summary$Sp_Code
 hist(repro_fill$Veg_Mass)
+
+# Remove species with less than 3 entries
+repro_fill_hi_n <- repro_fill[-(which(repro_fill$Sp_Code %in% c(Sp_List_small))),]
+unique(repro_fill_hi_n$Sp_Code)
+
+repro_fill_hi_n_narm <- repro_fill_hi_n[-(which(repro_fill_hi_n$total_fl_mass_ln %in% c(NA, -Inf))),]
+
+
 ```
 
 ### Graph Allometry by Species
@@ -357,10 +403,6 @@ ggsave("Allom_prelim_plot.jpg")
 repro_fill$Veg_Mass_ln <- log(repro_fill$Veg_Mass)
 repro_fill$total_fl_mass_ln <- log(repro_fill$total_fl_mass)
 
-# Remove species with less than 3 entries
-repro_fill_hi_n <- repro_fill[-(which(repro_fill$Sp_Code %in% c(Sp_List_small))),]
-unique(repro_fill_hi_n$Sp_Code)
-
 ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name, linetype = Native_Status)) +
   geom_abline(intercept = 0, slope = 1) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
@@ -376,6 +418,7 @@ ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scien
 
 ggsave("Allom_log_plot.jpg")
 
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, data = repro_fill_hi_n_narm))
 
 mod <- lmList(total_fl_mass_ln ~ Veg_Mass_ln | Sp_Code, data = repro_fill_hi_n)
 
@@ -570,8 +613,6 @@ ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Nativ
 ggsave("Allom_log_plot_Native.jpg")
 
 unique(repro_fill_hi_n$total_fl_mass_ln)
-
-repro_fill_hi_n_narm <- repro_fill_hi_n[-(which(repro_fill_hi_n$total_fl_mass_ln %in% c(NA, -Inf))),]
 
 unique(repro_fill_hi_n_narm$total_fl_mass_ln)
 
