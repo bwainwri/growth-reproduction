@@ -35,7 +35,7 @@ Bring in, explore, clean, rectify outliers, organize each trait or group of trai
 #| message: false
 #| warning: false
 #| echo: false
-
+install.packages("terra")
 library(readr)
 library(dplyr)
 library(tidyr)
@@ -45,6 +45,7 @@ library(lme4)
 library(LeafArea)
 library(mapdata)
 library(maps)
+library(terra)
 
 ```
 
@@ -64,15 +65,20 @@ ggplot() +
   coord_quickmap()
 
 states <- map_data("state")
+str(states)
 
 ca <- states %>%
   filter(region == "california")
+str(ca)
+
+crs("ca")
 
 ca_base <- ggplot(data = ca, mapping = aes(x = long, y = lat, group = group)) + 
   coord_quickmap() + 
   geom_polygon(color = "black", fill = "gray")
 ca_base + theme_void()
 ```
+
 ```{r}
 #| eval: false
 ## Need the pie chart data to have the following columns: ID, Lat, Long, Sp1 proportion, Sp2 proportion, etc.
@@ -113,12 +119,15 @@ comp_wide <- comp_sum %>%
 # add in lat and long for each site
 site_coord <- read_csv("site coord.csv")
 
+
+
 # practice adding them to the map
 
-ca_base <- ggplot(data = ca, mapping = aes(x = long, y = lat, group = group)) + 
+ca_base <- ggplot(data = ca, mapping = aes(x = long, y = lat)) + 
   geom_point(data = site_coord, aes(x = Lat, y = Long)) +
   coord_quickmap() + 
   geom_polygon(color = "black", fill = "gray")
+
 ca_base + theme_void()
 
 
@@ -146,7 +155,8 @@ map
 
 ?map_data
 
-
+# Go find a shapefile of California, CalFire has official county boundaries. 
+# Figure out what crs my points are in, go to settings and units in Gaia
 ```
 
 
