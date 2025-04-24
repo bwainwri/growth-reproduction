@@ -229,6 +229,8 @@ repro_full <- repro_full %>%
     Native_Status,
     Growth_Habit,
     Perenniality,
+    Rating,
+    Source,
     Recorder,
     Collection_Date,
     Plot,
@@ -251,13 +253,6 @@ repro_full <- repro_full %>%
     Veg_Mass
   )
 
-# Coerce all AVEBAR from SEDG to be AVEFAT
-repro_full$Sp_Code[repro_full$Sp_Code == "AVEBAR" & repro_full$Population == "SEDG"] <- "AVEFAT"
-
-repro_full$Scientific_Name[repro_full$Sp_Code == "CALMEN"] <- "Calandrinia menziesii"
-
-# check your work
-repro_full[which(repro_full$Population == "SEDG" & repro_full$Sp_Code == "AVEBAR"),]
 ```
 ```{r}
 repro_outliers <- repro_full
@@ -325,29 +320,25 @@ write_csv(vg_outliers, "vg_outliers.csv")
 ```
 
 ```{r}
-# need to find outliers before this
-repro_full <-
-  repro_full %>%
-  mutate(fl_average = mean(c(Flower_1_g, 
-                             Flower_2_g, 
-                             Flower_3_g, 
-                             Flower_4_g,
-                             Flower_5_g,
-                             Flower_6_g,
-                             Flower_7_g,
-                             Flower_8_g,
-                             Flower_9_g,
-                             Flower_10_g), na.rm = TRUE))
 
 # check to make sure you have the right columns
-repro_full[,16:25]
+
+firstfl = which(colnames(repro_full)=="Flower_1_g")
+lastfl = which(colnames(repro_full)=="Flower_10_g")
+
+repro_full[,c(firstfl:lastfl)]
+
 # Average flower masses for each individual
-repro_full$fl_average <- rowMeans(repro_full[,16:25], na.rm = TRUE)
+repro_full$fl_average <- rowMeans(repro_full[,c(firstfl:lastfl)], na.rm = TRUE)
 
 # Find the individuals with no flower mass
 no_fls <- repro_full[which(repro_full$fl_average == "NaN"),]
 #include everything except fl-Average
-no_fls <- no_fls[,1:26]
+
+firstcol = which(colnames(no_fls)=="Plant_ID")
+lastcol = which(colnames(no_fls)=="Veg_Mass")
+no_fls <- no_fls[,c(firstcol:lastcol)]
+
 repro_full <- repro_full[which(repro_full$fl_average != "NaN"),]
 
 avg_fls <- repro_full %>% 
@@ -357,6 +348,10 @@ avg_fls <- repro_full %>%
 # mast avg fls onto no_fls and then re-merge no-fls with larger dataset
 rep_fls <- left_join(no_fls,avg_fls,by=join_by(Sp_Code,Population,Treatment))
 repro_fill <- rbind(rep_fls,repro_full)
+
+# check your work
+repro_fill[which(is.na(repro_fill$fl_average)),]
+# There's one without averages to fill in? Calmen in E6...investigate
 
 repro_fill$total_fl_mass <- repro_fill$Flower_Count*repro_fill$fl_average
 
@@ -382,8 +377,8 @@ hist(repro_fill$Veg_Mass)
 repro_fill_hi_n <- repro_fill[-(which(repro_fill$Sp_Code %in% c(Sp_List_small))),]
 unique(repro_fill_hi_n$Sp_Code)
 
-repro_fill_hi_n_narm <- repro_fill_hi_n[-(which(repro_fill_hi_n$total_fl_mass_ln %in% c(NA, -Inf))),]
 
+repro_fill_hi_n_narm <- repro_fill_hi_n[-(which(repro_fill_hi_n$total_fl_mass %in% c(NA, -Inf))),]
 
 ```
 
@@ -410,10 +405,12 @@ ggsave("Allom_prelim_plot.jpg")
 ### Make everything log scale
 
 ```{r}
-repro_fill$Veg_Mass_ln <- log(repro_fill$Veg_Mass)
-repro_fill$total_fl_mass_ln <- log(repro_fill$total_fl_mass)
+repro_fill_hi_n_narm$Veg_Mass_ln <- log(repro_fill_hi_n_narm$Veg_Mass)
+repro_fill_hi_n_narm$total_fl_mass_ln <- log(repro_fill_hi_n_narm$total_fl_mass)
 
-ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name, linetype = Native_Status)) +
+repro_fill_hi_n_narm <- repro_fill_hi_n_narm[-(which(repro_fill_hi_n_narm$total_fl_mass_ln %in% c(NA, -Inf))),]
+
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name, linetype = Native_Status)) +
   geom_abline(intercept = 0, slope = 1) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
   geom_smooth(method = "lm", fill = NA, size = 0.5) +
@@ -428,9 +425,24 @@ ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scien
 
 ggsave("Allom_log_plot.jpg")
 
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name, linetype = Growth_Habit)) +
+  geom_abline(intercept = 0, slope = 1) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA, size = 0.5) +
+  # scale_color_viridis(discrete=TRUE) +
+  theme_bw() +
+  scale_linetype_manual(values = c("Forb" = "dashed", "Grass" = "solid")) +
+  labs(x = "ln(Vegetative Biomass (g))",
+       y = "ln(Reproductive Biomass (g))") +
+  theme(axis.text.x = element_text(size=9))
+
+# Consider log -scaling to make more digestible
+
+ggsave("Allom_log_plot_Growth.jpg")
+
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, data = repro_fill_hi_n_narm))
 
-mod <- lmList(total_fl_mass_ln ~ Veg_Mass_ln | Sp_Code, data = repro_fill_hi_n)
+mod <- lmList(total_fl_mass_ln ~ Veg_Mass_ln | Sp_Code, data = repro_fill_hi_n_narm)
 
 # anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Sp_Code, data = repro_fill_hi_n))
 
@@ -449,7 +461,7 @@ level_order <- c('ANGELO', 'MCL', 'BORR','SEDG','WWP')
 SiteColors <-
   setNames(c(viridis(5)), levels(c('ANGELO', 'MCL', 'BORR','SEDG','WWP')))
 
-repro_AVEBAR <- repro_fill[which(repro_fill$Sp_Code == "AVEBAR"),]
+repro_AVEBAR <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "AVEBAR"),]
 
 repro_AVEBAR$Population <- factor(repro_AVEBAR$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
@@ -468,7 +480,7 @@ ggsave("Allom_log_plot_AVEBAR.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_AVEBAR))
 
-repro_BRODIA <- repro_fill[which(repro_fill$Sp_Code == "BRODIA"),]
+repro_BRODIA <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "BRODIA"),]
 
 repro_BRODIA$Population <- factor(repro_BRODIA$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
@@ -487,7 +499,7 @@ ggsave("Allom_log_plot_BRODIA.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BRODIA))
 
-repro_BROHOR <- repro_fill[which(repro_fill$Sp_Code == "BROHOR"),]
+repro_BROHOR <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "BROHOR"),]
 
 repro_BROHOR$Population <- factor(repro_BROHOR$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
@@ -506,7 +518,7 @@ ggsave("Allom_log_plot_BROHOR.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BROHOR))
 
-repro_BROMAD <- repro_fill[which(repro_fill$Sp_Code == "BROMAD"),]
+repro_BROMAD <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "BROMAD"),]
 
 repro_BROMAD$Population <- factor(repro_BROMAD$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
@@ -525,7 +537,7 @@ ggsave("Allom_log_plot_BROMAD.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BROMAD))
 
-repro_DAUPUS <- repro_fill[which(repro_fill$Sp_Code == "DAUPUS"),]
+repro_DAUPUS <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "DAUPUS"),]
 
 repro_DAUPUS$Population <- factor(repro_DAUPUS$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
@@ -544,7 +556,7 @@ ggsave("Allom_log_plot_DAUPUS.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_DAUPUS))
 
-repro_LUPBIC <- repro_fill[which(repro_fill$Sp_Code == "LUPBIC"),]
+repro_LUPBIC <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "LUPBIC"),]
 
 repro_LUPBIC$Population <- factor(repro_LUPBIC$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
@@ -563,7 +575,7 @@ ggsave("Allom_log_plot_LUPBIC.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_LUPBIC))
 
-repro_MADGRA <- repro_fill[which(repro_fill$Sp_Code == "MADGRA"),]
+repro_MADGRA <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "MADGRA"),]
 
 repro_MADGRA$Population <- factor(repro_MADGRA$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
@@ -582,7 +594,7 @@ ggsave("Allom_log_plot_MADGRA.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_MADGRA))
 
-repro_MICCAL <- repro_fill[which(repro_fill$Sp_Code == "MICCAL"),]
+repro_MICCAL <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "MICCAL"),]
 
 repro_MICCAL$Population <- factor(repro_MICCAL$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
@@ -604,13 +616,15 @@ anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_MADGRA))
 # write_csv(repro_fill, "repro_growth_intern.csv")
 
 ```
+It seems like for forbs they are conservative from southern populations and aggressive from northern and grasses (except BROMAD), they are aggressive from the south and conservative from the north?
+
 
 - Compare Native v non-native species
 - Compare grasses and forbs
 - Use model comparison to detect whether growth habit, native status, or perenniality are the best predictors of reproductive allometry
 
 ```{r}
-ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status)) +
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status)) +
   geom_abline(intercept = 0, slope = 1) +
   geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status, alpha = 0.5)) +
   geom_smooth(method = "lm", fill = NA) +
@@ -627,20 +641,114 @@ unique(repro_fill_hi_n$total_fl_mass_ln)
 unique(repro_fill_hi_n_narm$total_fl_mass_ln)
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Native_Status, data = repro_fill_hi_n_narm))
+
+lmList(total_fl_mass_ln ~ Veg_Mass_ln | Native_Status, data = repro_fill_hi_n_narm)
+
 ```
 
 ```{r}
-ggplot(repro_fill_hi_n, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
+repro_fill_hi_n_narm$Population <- factor(repro_fill_hi_n_narm$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
+
+ 
+
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   geom_abline(intercept = 0, slope = 1) +
-  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
+ # geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   geom_smooth(method = "lm", fill = NA) +
+  scale_color_manual(values = c("ANGELO" = "#440154FF", "MCL" = "#3B528BFF", "BORR" = "#21908CFF", "SEDG" = "#5DC863FF", "WWP" = "#FDE725FF")) +
   theme_bw() +
   labs(x = "ln(Vegetative Biomass (g))",
        y = "ln(Reproductive Biomass (g))") +
   theme(axis.text.x = element_text(size=9))
 
 ggsave("Allom_log_plot_Pop.jpg")
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_fill_hi_n_narm))
+
+lmList(total_fl_mass_ln ~ Veg_Mass_ln | Population, data = repro_fill_hi_n_narm)
+
 ```
+
+Inspect functional type
+
+```{r}
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit, alpha = 0.5)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  scale_color_viridis(discrete=TRUE) +
+  labs(x = "ln(Vegetative Biomass (g))",
+       y = "ln(Reproductive Biomass (g))") +
+  theme(axis.text.x = element_text(size=9))
+
+ggsave("Allom_log_plot_GrowthHab.jpg")
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Growth_Habit, data = repro_fill_hi_n_narm))
+
+lmList(total_fl_mass_ln ~ Veg_Mass_ln | Growth_Habit, data = repro_fill_hi_n_narm)
+
+```
+
+Looks awfully similar to native vs non-native plot. Need to parse out what's going on. 
+
+I wonder if I looked at native vs non-native forbs only because all grasses featured are non-native. 
+
+```{r}
+repro_forb <- repro_fill_hi_n_narm %>% 
+  filter(Growth_Habit == "Forb")
+
+ggplot(repro_forb, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status, alpha = 0.5)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  scale_color_viridis(discrete=TRUE) +
+  labs(x = "ln(Vegetative Biomass (g))",
+       y = "ln(Reproductive Biomass (g))") +
+  theme(axis.text.x = element_text(size=9))
+
+ggsave("Allom_log_plot_NativeForb.jpg")
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Native_Status, data = repro_forb))
+
+lmList(total_fl_mass_ln ~ Veg_Mass_ln | Native_Status, data = repro_forb)
+
+
+
+```
+They are the same.
+
+And/or compared native v invasive v non-native.
+
+```{r}
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Rating)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Rating, alpha = 0.5)) +
+  geom_smooth(method = "lm", fill = NA) +
+  theme_bw() +
+  scale_color_viridis(discrete=TRUE) +
+  labs(x = "ln(Vegetative Biomass (g))",
+       y = "ln(Reproductive Biomass (g))") +
+  theme(axis.text.x = element_text(size=9))
+
+ggsave("Allom_log_plot_NativeRating.jpg")
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Rating, data = repro_fill_hi_n_narm))
+
+lmList(total_fl_mass_ln ~ Veg_Mass_ln | Rating, data = repro_fill_hi_n_narm)
+
+
+
+
+```
+
+There's only two species with classification "High" so might not be a good metric. We could lump all the high and moderates together and limited and non-native together
+
+Then create a clustered bar graph where each cluster is a population and each bar is native, non-native, and invasive, and the bars indicate the RV slope.
+
+
+
 
 ## Relative Growth Rate
 
@@ -1143,7 +1251,7 @@ licor2 <- left_join(licor,leaf_licor_area,by=c("Plant_ID" = "Plant_ID"))
 # Come back and investigate NAs for licor2 -- why are some leaf areas missing
 
 # multiply focal data by leaf area fraction
-licor2$leaf_ratio <- licor2$total.leaf.area/6
+licor2$leaf_ratio <- 6/licor2$total.leaf.area
 licor2 <- licor2 %>% 
   filter(!is.na(total.leaf.area)) %>% # filter NAs for now
   mutate(WUE_adj = leaf_ratio*WUE,
@@ -1153,13 +1261,20 @@ licor2 <- licor2 %>%
          gsw_adj = leaf_ratio*as.numeric(gsw))
 str(licor2)
 
-# Need to come back and check if simply multiplying is fine, ask Jen
-
 # remove licor data with gsw below threshold
+licor2[which(licor2$gsw_adj < 0.03),]
+
+# There are values from September 2020???? investigate
+# Weirdly this file 2023-04-30-0922_BRODIA_39.csv has the date at Sep 2020, some glitch. will need to fix
+# September 23, 2020
 
 # test for licor outliers by species, population, and treatment
 
+
+
 # average licor data by plant_id
+
+
 
 # extract species and plot from plant id
 
