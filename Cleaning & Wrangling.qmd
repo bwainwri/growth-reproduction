@@ -35,7 +35,7 @@ Bring in, explore, clean, rectify outliers, organize each trait or group of trai
 #| message: false
 #| warning: false
 #| echo: false
-install.packages("terra")
+
 library(readr)
 library(dplyr)
 library(tidyr)
@@ -46,7 +46,7 @@ library(LeafArea)
 library(mapdata)
 library(maps)
 library(terra)
-
+library(broom)
 ```
 
 ## CA Map and Plant Comp
@@ -624,9 +624,6 @@ It seems like for forbs they are conservative from southern populations and aggr
 - Use model comparison to detect whether growth habit, native status, or perenniality are the best predictors of reproductive allometry
 
 ```{r}
-# change legend position to bottom
-
-
 ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status)) +
   #geom_abline(intercept = 0, slope = 1) +
   geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status, alpha = 0.5)) +
@@ -674,7 +671,7 @@ ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = 
 
 ggsave("Allom_log_plot_Pop.jpg")
 
-anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_fill_hi_n_narm))
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Native_Status, data = repro_fill_hi_n_narm))
 
 lmList(total_fl_mass_ln ~ Veg_Mass_ln | Population, data = repro_fill_hi_n_narm)
 
@@ -750,14 +747,98 @@ anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Rating, data = repro_fill_hi_n_narm))
 lmList(total_fl_mass_ln ~ Veg_Mass_ln | Rating, data = repro_fill_hi_n_narm)
 
 
-
-
 ```
 
 There's only two species with classification "High" so might not be a good metric. We could lump all the high and moderates together and limited and non-native together
 
 Then create a clustered bar graph where each cluster is a population and each bar is native, non-native, and invasive, and the bars indicate the RV slope.
 
+Make a graph with POpulation on the x axis and slope of log(V) by log(R) on the y-axis. Each population has two bars one for average slope of native and one for average slope of non-native
+```{r}
+head(repro_fill_hi_n_narm)
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Native_Status, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln:Population:Native_Status, data = repro_fill_hi_n_narm)
+str(mod)
+
+std_err <- summary(mod)$coefficients[, 2]
+coefficients(mod)
+cf <- coefficients(mod)
+str(cf)
+cf[1]
+cf[2]
+
+repro_summary <- repro_fill_hi_n %>% 
+  group_by(Population,Native_Status) %>% 
+  summarise(slope = NA,
+            std_err = NA)
+
+## should also include std error
+
+repro_summary[repro_summary$Population == 'ANGELO' & repro_summary$Native_Status == 'Native',3] <- cf["Veg_Mass_ln:PopulationANGELO:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'ANGELO' & repro_summary$Native_Status == 'Native',4] <- std_err["Veg_Mass_ln:PopulationANGELO:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'ANGELO' & repro_summary$Native_Status == 'Non-native',3] <- cf["Veg_Mass_ln:PopulationANGELO:Native_StatusNon-native"]
+
+repro_summary[repro_summary$Population == 'ANGELO' & repro_summary$Native_Status == 'Non-native',4] <- std_err["Veg_Mass_ln:PopulationANGELO:Native_StatusNon-native"]
+
+repro_summary[repro_summary$Population == 'MCL' & repro_summary$Native_Status == 'Native',3] <- cf["Veg_Mass_ln:PopulationMCL:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'MCL' & repro_summary$Native_Status == 'Native',4] <- std_err["Veg_Mass_ln:PopulationMCL:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'MCL' & repro_summary$Native_Status == 'Non-native',3] <- cf["Veg_Mass_ln:PopulationMCL:Native_StatusNon-native"]
+
+repro_summary[repro_summary$Population == 'MCL' & repro_summary$Native_Status == 'Non-native',4] <- std_err["Veg_Mass_ln:PopulationMCL:Native_StatusNon-native"]
+
+repro_summary[repro_summary$Population == 'BORR' & repro_summary$Native_Status == 'Native',3] <- cf["Veg_Mass_ln:PopulationBORR:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'BORR' & repro_summary$Native_Status == 'Native',4] <- std_err["Veg_Mass_ln:PopulationBORR:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'BORR' & repro_summary$Native_Status == 'Non-native',3] <- cf["Veg_Mass_ln:PopulationBORR:Native_StatusNon-native"]
+
+repro_summary[repro_summary$Population == 'BORR' & repro_summary$Native_Status == 'Non-native',4] <- std_err["Veg_Mass_ln:PopulationBORR:Native_StatusNon-native"]
+
+repro_summary[repro_summary$Population == 'SEDG' & repro_summary$Native_Status == 'Native',3] <- cf["Veg_Mass_ln:PopulationSEDG:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'SEDG' & repro_summary$Native_Status == 'Native',4] <- std_err["Veg_Mass_ln:PopulationSEDG:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'SEDG' & repro_summary$Native_Status == 'Non-native',3] <- cf["Veg_Mass_ln:PopulationSEDG:Native_StatusNon-native"]
+
+repro_summary[repro_summary$Population == 'SEDG' & repro_summary$Native_Status == 'Non-native',4] <- std_err["Veg_Mass_ln:PopulationSEDG:Native_StatusNon-native"]
+
+repro_summary[repro_summary$Population == 'WWP' & repro_summary$Native_Status == 'Native',3] <- cf["Veg_Mass_ln:PopulationWWP:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'WWP' & repro_summary$Native_Status == 'Native',4] <- std_err["Veg_Mass_ln:PopulationWWP:Native_StatusNative"]
+
+repro_summary[repro_summary$Population == 'WWP' & repro_summary$Native_Status == 'Non-native',3] <- cf["Veg_Mass_ln:PopulationWWP:Native_StatusNon-native"]
+
+repro_summary[repro_summary$Population == 'WWP' & repro_summary$Native_Status == 'Non-native',4] <- std_err["Veg_Mass_ln:PopulationWWP:Native_StatusNon-native"]
+
+# add std error bars
+
+precip <- read_csv("Site_Precip.csv")
+precip$Precip_mm <- as.factor(precip$Precip_mm)
+repro_summary_2 <- left_join(repro_summary,precip, by = join_by("Population"))
+
+ggplot(repro_summary_2, aes(x = factor(Precip_mm, level=c('1780','757','603','380','320')), y = slope, fill = Native_Status)) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_errorbar(aes(ymin=slope-std_err, ymax=slope+std_err), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_bw() +
+   theme(
+    legend.text = element_text(size = 25),
+    axis.text=element_text(size=16),
+    axis.title=element_text(size=25),
+    legend.position = "bottom"
+  ) +
+  scale_fill_manual(values = c("Native" = "#440154FF", "Non-native" = "#5DC863FF")) +
+  labs(x = "Average Annual Precipitation (mm)",
+       y = "Slope of log(V) and log(R)",
+       fill = "")
+
+ggsave("Slope_Pop_Native.jpg")
+```
 
 
 
