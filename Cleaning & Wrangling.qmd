@@ -47,6 +47,7 @@ library(mapdata)
 library(maps)
 library(terra)
 library(broom)
+library(plyr)
 ```
 
 ## CA Map and Plant Comp
@@ -1382,6 +1383,50 @@ licor2[which(licor2$gsw_adj < 0.03),]
 ## Height
 
 ## Leaf Nitrogen
+
+```{r}
+cn <- read_csv("CN_2023.csv")
+str(cn)
+
+# break out species from sample ID
+cn$sp <- substr(cn$Sample_ID,4,9)
+
+sp_n <- count(cn, "sp")
+sp_n[which(sp_n$freq < 4),1]
+sp_rm <- sp_n[which(sp_n$freq < 4),1] 
+
+cn <- cn %>% 
+  filter(!sp %in% sp_rm)
+
+str(cn)
+
+cn_sum <- cn %>% 
+  group_by(sp) %>%
+  dplyr::summarise(mean_c13 = mean(δ13CVPDB_permil),
+                   std_c13 = sd(δ13CVPDB_permil),
+                   mean_n = mean(Total_N_µg),
+                   std_n = sd(Total_N_µg),
+                   mean_n15 = mean(δ15NAir_permil),
+                   std_n15 = sd(δ15NAir_permil))
+
+cn_sum <- cn_sum %>% 
+  mutate(c13_max = mean_c13 + 3*std_c13,
+         c13_min = mean_c13 - 3*std_c13,
+         n_max = mean_n + 3*std_n,
+         n_min = mean_n - 3*std_n,
+         n15_max = mean_n15 + 3*std_n15,
+         n15_min = mean_n15 - 3*std_n15)
+
+cn_avgs <- left_join(cn, cn_sum, by=join_by("sp"))
+
+c13_outliers <- cn_avgs[which(cn_avgs$δ13CVPDB_permil > cn_avgs$c13_max | cn_avgs$δ13CVPDB_permil < cn_avgs$c13_min),c("Sample_ID","sp", "δ13CVPDB_permil","mean_c13","std_c13","c13_max","c13_min")]
+
+n_outliers <- cn_avgs[which(cn_avgs$Total_N_µg > cn_avgs$n_max | cn_avgs$Total_N_µg < cn_avgs$n_min),c("Sample_ID","sp", "Total_N_µg","mean_n","std_n","n_max","n_min")]
+
+n15_outliers <- cn_avgs[which(cn_avgs$δ15NAir_permil > cn_avgs$n15_max | cn_avgs$δ15NAir_permil < cn_avgs$n15_min),c("Sample_ID","sp", "δ15NAir_permil","mean_n15","std_n15","n15_max","n15_min")]
+
+```
+
 
 ## Date of first flower
 
