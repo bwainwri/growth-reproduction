@@ -7,7 +7,7 @@ editor: visual
 
 ## Background
 
-These data come from a common garden drought experiment in Davis, California investigating the functional trait strategies of California grassland plants from five different grassland communities spanning California's latitudinal precipitation gradient. There 10-12 species per community or provenance, each provenance has 16 plots (8 drought, 8 control) across 10 shelters (5 drought, 5 control). In 2022-2023, we focused on collecting whole plant traits, including reproductive investment. This study focuses on how these traits relate to reproductive investment depending on drought treatment, native status, or provenance. This document will clean and wrangle the many datasets and images associated with this study.
+These data come from a common garden drought experiment in Davis, California investigating the functional trait strategies of California grassland plants from five different grassland communities spanning California's latitudinal precipitation gradient. There 10-12 species per community or provenance, each provenance has 16 plots (8 drought, 8 control) across 10 shelters (5 drought, 5 control). In 2022-2023, we focused on collecting whole plant traits, including reproductive investment. This study focuses on how these traits relate to reproductive investment depending on native status, growth habit or provenance. This document will clean and wrangle the many datasets and images associated with this study.
 
 ## Traits & Objectives
 
@@ -36,7 +36,10 @@ Bring in, explore, clean, rectify outliers, organize each trait or group of trai
 #| warning: false
 #| echo: false
 
+install.packages("geodata")
+
 library(readr)
+library(plyr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
@@ -47,37 +50,52 @@ library(mapdata)
 library(maps)
 library(terra)
 library(broom)
-library(plyr)
+library(tidyverse)
+library(sf)
+library(rnaturalearth)
+library(geodata)
 ```
 
 ## CA Map and Plant Comp
 
 Make a map of California with the inside of the boundary as a heat map of an aridity index. Then add five pie charts of plant composition.
 
-Can try to get climate data from: https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/county/mapping/4/pcp/189606/12/value
+Precip data from WorlClim
 
 ```{r}
-#| eval: false
-plant_comp <- read_csv("USDA_Site Composition.csv")
 
-usa <- map_data("usa") # we already did this, but we can do it again
-ggplot() + 
-  geom_polygon(data = usa, aes(x = long, y = lat, group = group)) + 
-  coord_quickmap()
+library(terra)
+library(sf)
+library(ggplot2)
+library(geodata)
+library(tigris)
 
-states <- map_data("state")
-str(states)
+# ----- climate data -----
+ppt <- worldclim_global(var = "prec", res = 5, path = "data/")
+ppt_annual <- sum(ppt)
 
-ca <- states %>%
-  filter(region == "california")
-str(ca)
+# ----- California boundary -----
+ca <- states(cb = TRUE) |> subset(NAME == "California")
+ca_vect <- vect(ca)
 
-crs("ca")
+# ----- crop & mask -----
+ppt_ca <- crop(ppt_annual, ca_vect)
+ppt_ca <- mask(ppt_ca, ca_vect)
 
-ca_base <- ggplot(data = ca, mapping = aes(x = long, y = lat, group = group)) + 
-  coord_quickmap() + 
-  geom_polygon(color = "black", fill = "gray")
-ca_base + theme_void()
+# ----- convert to df -----
+ppt_df <- as.data.frame(ppt_ca, xy = TRUE)
+names(ppt_df) <- c("x", "y", "ppt")
+
+# ----- plot -----
+ggplot(ppt_df) +
+  geom_raster(aes(x = x, y = y, fill = ppt)) +
+  geom_sf(data = ca, fill = NA, color = "black") +
+  scale_fill_viridis_c(name = "Annual precip (mm)") +
+  coord_sf() +
+  labs(title = "Annual Precipitation in California (WorldClim v2.1)") +
+  theme_minimal()
+
+
 ```
 
 ```{r}
@@ -85,7 +103,7 @@ ca_base + theme_void()
 ## Need the pie chart data to have the following columns: ID, Lat, Long, Sp1 proportion, Sp2 proportion, etc.
 
 # so we need to pivot wider the dataset and average across ten plots and add coordaintes for each site then use mapPies function
-
+plant_comp <- read_csv("USDA_Site Composition.csv")
 str(plant_comp)
 
 # First average across ten plots
@@ -102,6 +120,22 @@ comp_sum <- comp_sum %>%
 
 comp_sum$prop_adj <- comp_sum$prop_cov/comp_sum$prop_total
 
+# get rid of bare ground, rock, and litter
+comp_sum <- comp_sum %>%
+  filter(!Species %in% c("Litter","Rock","Bare ground")) %>% 
+  group_by(Site) %>% 
+  arrange(desc(prop_adj), .by_group = TRUE)
+
+PlList_2023 <- read_csv("USDA Drought Project 2023 Plant List.csv")
+pl_list <- PlList_2023 %>% 
+  select(Site, Species)
+
+comp_reduced <- left_join(pl_list, comp_sum, by=join_by(Site, Species))
+
+### LEFT OFF HERE ###
+
+# rank by prop_adj within each site -- actually just bring in final plant list and use proportions of that
+
 # check to make sure it worked
 comp_sum <- comp_sum %>% 
   group_by(Site) %>% 
@@ -116,66 +150,11 @@ comp_wide <- comp_sum %>%
               values_from = prop_adj)
 
 # need to go back and rectify unknown species
-
-# add in lat and long for each site
-site_coord <- read_csv("site coord.csv")
-
-
-
-# practice adding them to the map
-
-ca_base <- ggplot(data = ca, mapping = aes(x = long, y = lat)) + 
-  geom_point(data = site_coord, aes(x = Lat, y = Long)) +
-  coord_quickmap() + 
-  geom_polygon(color = "black", fill = "gray")
-
-ca_base + theme_void()
-
-
-map_data <- 
-  base_world +
-  geom_point(data=cities, 
-             aes(x=Longitude, y=Latitude), colour="Deep Pink", 
-             fill="Pink",pch=21, size=5, alpha=I(0.7))
-
-map_data
-
-#Creat a base plot with gpplot2
-p <- ggplot() + coord_fixed() +
-  xlab("") + ylab("")
-
-#Add map to base plot
-base_ca_messy <- p + geom_polygon(data=ca, aes(x=long, y=lat, group=group), 
-                               colour="light green", fill="light green")
-
-map <- base_ca_messy + geom_point(data = site_coord,
-                                  aes(x=Lat, y=Long))
-map
-
-# Points are way off, it's probably wrong coordinate system
-
-?map_data
-
-# Go find a shapefile of California, CalFire has official county boundaries. 
-# Figure out what crs my points are in, go to settings and units in Gaia
+# For now just do top 12 species, and then reader can possibly see overlap
 ```
 
 
 ## Reproductive allocation & End of Season biomass
-
-These data are still being processed in the lab. 
-
-Tasks:
-Stats for comparing lines
-Bold or dash native/invasive species in giant plot
-Jitter points in native or invasive plots
-Make populations colors the same
-Use viridis scale
-
-Determine outliers for veg mass and flower mass for each species
-Remove outliers
-Investigate outliers (when we're done)
-
 
 For now, read in what we have so far and create some preliminary figures and analyses.
 
@@ -342,6 +321,8 @@ no_fls <- no_fls[,c(firstcol:lastcol)]
 
 repro_full <- repro_full[which(repro_full$fl_average != "NaN"),]
 
+# detach(package:plyr)
+# when plyr is loaded after dplyr, group_by doesn't work
 avg_fls <- repro_full %>% 
   group_by(Sp_Code, Population, Treatment) %>% 
   summarise(fl_average = mean(fl_average, na.rm = TRUE))
@@ -359,6 +340,7 @@ repro_fill$total_fl_mass <- repro_fill$Flower_Count*repro_fill$fl_average
 # There's an entry for ESCCAL which hasn't been done yet -- look into
 # Later you can remove any species with only one entry
 ```
+
 ### Find outliers, use ratio of V to R
 
 Go back and detect outliers for flower mass per species 
@@ -387,7 +369,7 @@ repro_fill_hi_n_narm <- repro_fill_hi_n[-(which(repro_fill_hi_n$total_fl_mass %i
 
 Here, make a graph with vegetative biomass on the x-axis and reproductive biomass on the y-axis. Have each species be a different color with raw points on the graph, faded in color. Add a line for each species.
 
-Will need to go back and test nad remove outliers
+Will need to go back and test and remove outliers
 
 ```{r}
 ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Scientific_Name)) +
@@ -443,6 +425,7 @@ ggsave("Allom_log_plot_Growth.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, data = repro_fill_hi_n_narm))
 
+# not sure what this is for
 mod <- lmList(total_fl_mass_ln ~ Veg_Mass_ln | Sp_Code, data = repro_fill_hi_n_narm)
 
 # anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Sp_Code, data = repro_fill_hi_n))
@@ -480,7 +463,9 @@ ggplot(repro_AVEBAR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 ggsave("Allom_log_plot_AVEBAR.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_AVEBAR))
+```
 
+```{r}
 repro_BRODIA <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "BRODIA"),]
 
 repro_BRODIA$Population <- factor(repro_BRODIA$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
@@ -499,7 +484,9 @@ ggplot(repro_BRODIA, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 ggsave("Allom_log_plot_BRODIA.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BRODIA))
+```
 
+```{r}
 repro_BROHOR <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "BROHOR"),]
 
 repro_BROHOR$Population <- factor(repro_BROHOR$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
@@ -518,7 +505,9 @@ ggplot(repro_BROHOR, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 ggsave("Allom_log_plot_BROHOR.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BROHOR))
+```
 
+```{r}
 repro_BROMAD <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "BROMAD"),]
 
 repro_BROMAD$Population <- factor(repro_BROMAD$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
@@ -537,7 +526,9 @@ ggplot(repro_BROMAD, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 ggsave("Allom_log_plot_BROMAD.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BROMAD))
+```
 
+```{r}
 repro_DAUPUS <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "DAUPUS"),]
 
 repro_DAUPUS$Population <- factor(repro_DAUPUS$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
@@ -556,7 +547,9 @@ ggplot(repro_DAUPUS, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 ggsave("Allom_log_plot_DAUPUS.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_DAUPUS))
+```
 
+```{r}
 repro_LUPBIC <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "LUPBIC"),]
 
 repro_LUPBIC$Population <- factor(repro_LUPBIC$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
@@ -575,7 +568,9 @@ ggplot(repro_LUPBIC, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 ggsave("Allom_log_plot_LUPBIC.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_LUPBIC))
+```
 
+```{r}
 repro_MADGRA <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "MADGRA"),]
 
 repro_MADGRA$Population <- factor(repro_MADGRA$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
@@ -594,7 +589,9 @@ ggplot(repro_MADGRA, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Populati
 ggsave("Allom_log_plot_MADGRA.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_MADGRA))
+```
 
+```{r}
 repro_MICCAL <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "MICCAL"),]
 
 repro_MICCAL$Population <- factor(repro_MICCAL$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
@@ -622,7 +619,7 @@ It seems like for forbs they are conservative from southern populations and aggr
 
 - Compare Native v non-native species
 - Compare grasses and forbs
-- Use model comparison to detect whether growth habit, native status, or perenniality are the best predictors of reproductive allometry
+- Use model comparison to detect whether growth habit or native status are the best predictors of reproductive allometry
 
 ```{r}
 ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status)) +
@@ -658,9 +655,7 @@ lmList(total_fl_mass_ln ~ Veg_Mass_ln | Native_Status, data = repro_fill_hi_n_na
 ```{r}
 repro_fill_hi_n_narm$Population <- factor(repro_fill_hi_n_narm$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
 
- 
-
-ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population, linetype = Native_Status)) +
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   geom_abline(intercept = 0, slope = 1) +
  # geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
   geom_smooth(method = "lm", fill = NA) +
@@ -722,9 +717,6 @@ ggsave("Allom_log_plot_NativeForb.jpg")
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Native_Status, data = repro_forb))
 
 lmList(total_fl_mass_ln ~ Veg_Mass_ln | Native_Status, data = repro_forb)
-
-
-
 ```
 They are the same.
 
@@ -754,7 +746,7 @@ There's only two species with classification "High" so might not be a good metri
 
 Then create a clustered bar graph where each cluster is a population and each bar is native, non-native, and invasive, and the bars indicate the RV slope.
 
-Make a graph with POpulation on the x axis and slope of log(V) by log(R) on the y-axis. Each population has two bars one for average slope of native and one for average slope of non-native
+Make a graph with Population on the x axis and slope of log(V) by log(R) on the y-axis. Each population has two bars one for average slope of native and one for average slope of non-native
 ```{r}
 head(repro_fill_hi_n_narm)
 
@@ -841,7 +833,9 @@ ggplot(repro_summary_2, aes(x = factor(Precip_mm, level=c('1780','757','603','38
 ggsave("Slope_Pop_Native.jpg")
 ```
 
+No clear pattern here. Would need to see which species are driving these peaks and velleys.
 
+Try it again with distance from common garden.
 
 ## Relative Growth Rate
 
@@ -1025,6 +1019,9 @@ rgr_hlv2 <- rgr_hlv %>%
 ```
 
 ### Exploratory Graphs
+We have height, leaf number, area, and volume
+
+
 
 
 ### Select Reference times
