@@ -36,8 +36,7 @@ Bring in, explore, clean, rectify outliers, organize each trait or group of trai
 #| warning: false
 #| echo: false
 
-install.packages("geodata")
-
+library(colorspace)
 library(readr)
 library(plyr)
 library(dplyr)
@@ -112,19 +111,11 @@ comp_sum <- plant_comp %>%
   group_by(Site, Species) %>% 
   summarise(avg_cov = mean(Percent_Cover, na.rm = TRUE))
 
-comp_sum$prop_cov <- comp_sum$avg_cov/100
-
-comp_sum <- comp_sum %>% 
-  group_by(Site) %>% 
-  mutate(prop_total = sum(prop_cov))
-
-comp_sum$prop_adj <- comp_sum$prop_cov/comp_sum$prop_total
-
 # get rid of bare ground, rock, and litter
 comp_sum <- comp_sum %>%
   filter(!Species %in% c("Litter","Rock","Bare ground")) %>% 
   group_by(Site) %>% 
-  arrange(desc(prop_adj), .by_group = TRUE)
+  arrange(desc(avg_c), .by_group = TRUE)
 
 PlList_2023 <- read_csv("USDA Drought Project 2023 Plant List.csv")
 pl_list <- PlList_2023 %>% 
@@ -132,25 +123,126 @@ pl_list <- PlList_2023 %>%
 
 comp_reduced <- left_join(pl_list, comp_sum, by=join_by(Site, Species))
 
-### LEFT OFF HERE ###
+comp_reduced$prop_cov <- comp_reduced$avg_cov/100
 
-# rank by prop_adj within each site -- actually just bring in final plant list and use proportions of that
-
-# check to make sure it worked
-comp_sum <- comp_sum %>% 
+comp_reduced <- comp_reduced %>% 
   group_by(Site) %>% 
-  mutate(prop_adj_total = sum(prop_adj))
-?pivot_wider
+  mutate(prop_total = sum(prop_cov))
 
-comp_wide <- comp_sum %>% 
+comp_reduced$prop_adj <- comp_reduced$prop_cov/comp_reduced$prop_total
+
+comp_wide <- comp_reduced %>% 
   select(Site,
          Species,
          prop_adj) %>% 
   pivot_wider(names_from = Species,
               values_from = prop_adj)
 
-# need to go back and rectify unknown species
-# For now just do top 12 species, and then reader can possibly see overlap
+## add lat and long columns
+comp_wide$lat <- c(39.75141,37.37914,38.87508,34.70243,34.91771)
+comp_wide$long <- c(-123.6302,-121.72841,-122.42114,-120.0545,-119.16882)
+
+install.packages("ggnewscale")
+library(ggnewscale)
+
+comp_wide[is.na(comp_wide)] <- 0
+colors <- rainbow_hcl(37)
+# ----- plot -----
+ggplot() +
+  geom_raster(data = ppt_df, aes(x = x, y = y, fill = ppt)) +
+    scale_fill_viridis_c(name = "Annual precip (mm)") +
+  new_scale_fill() +
+  geom_sf(data = ca, fill = NA, color = "black") +
+  geom_scatterpie(
+    data = comp_wide,
+    aes(long, lat, r = 1),
+    cols = c("Acmispon parviflorus"
+             ,"Aira caryophyllea"
+             ,"Bromus diandrus"
+             ,"Bromus hordeaceus"
+             ,"Clarkia purpurea"
+             ,"Danthonia californica"
+             ,"Daucus pusillus"
+             ,"Eschscholzia californica"
+             ,"Galium parisiense"
+             ,"Hypochaeris glabra"
+             ,"Madia gracilis"
+             ,"Sanicula bipinnatifida"
+             ,"Avena barbata"
+             ,"Erodium botrys"
+             ,"Geranium dissectum"
+             ,"Lupinus bicolor"
+             ,"Torilis arvensis"
+             ,"Trifolium hirtum"
+             ,"Vicia sativa"
+             ,"Bromus madritensis"
+             ,"Elymus caput-medusae"
+             ,"Holocarpha virgata"
+             ,"Micropus californicus"
+             ,"Plantago erecta"
+             ,"Avena fatua"
+             ,"Calandrinia menziesii"
+             ,"Centaurea melitensis"
+             ,"Corethrogyne filaginifolia"
+             ,"Erodium cicutarium"
+             ,"Stipa pulchra"
+             ,"Amsinckia menziesii"
+             ,"Bromus arenarius"
+             ,"Caulanthus coulteri"
+             ,"Lupinus microcarpus"
+             ,"Lupinus succulentus"
+             ,"Phacelia tanacetifolia"
+             ,"Mirabilis multiflora")   # your pie-slice variables
+  ) +
+scale_fill_manual(
+    name = "Species",
+    values = c(
+             "Acmispon parviflorus" = colors[1]
+             ,"Aira caryophyllea" = colors[2]
+             ,"Bromus diandrus" = colors[3]
+             ,"Bromus hordeaceus" = colors[4]
+             ,"Clarkia purpurea" = colors[5]
+             ,"Danthonia californica" = colors[6]
+             ,"Daucus pusillus" = colors[7]
+             ,"Eschscholzia californica" = colors[8]
+             ,"Galium parisiense" = colors[9]
+             ,"Hypochaeris glabra" = colors[10]
+             ,"Madia gracilis" = colors[11]
+             ,"Sanicula bipinnatifida" = colors[12]
+             ,"Avena barbata" = colors[13]
+             ,"Erodium botrys" = colors[14]
+             ,"Geranium dissectum" = colors[15]
+             ,"Lupinus bicolor" = colors[16]
+             ,"Torilis arvensis" = colors[17]
+             ,"Trifolium hirtum" = colors[18]
+             ,"Vicia sativa" = colors[19]
+             ,"Bromus madritensis" = colors[20]
+             ,"Elymus caput-medusae" = colors[21]
+             ,"Holocarpha virgata" = colors[22]
+             ,"Micropus californicus" = colors[23]
+             ,"Plantago erecta" = colors[24]
+             ,"Avena fatua" = colors[25]
+             ,"Calandrinia menziesii" = colors[26]
+             ,"Centaurea melitensis" = colors[27]
+             ,"Corethrogyne filaginifolia" = colors[28]
+             ,"Erodium cicutarium" = colors[29]
+             ,"Stipa pulchra" = colors[30]
+             ,"Amsinckia menziesii" = colors[31]
+             ,"Bromus arenarius" = colors[32]
+             ,"Caulanthus coulteri" = colors[33]
+             ,"Lupinus microcarpus" = colors[34]
+             ,"Lupinus succulentus" = colors[35]
+             ,"Phacelia tanacetifolia" = colors[36]
+             ,"Mirabilis multiflora" = colors[37]
+    )
+    , guide = "none"
+  ) +
+  geom_sf(data = ca, fill = NA, color = "black") +
+  coord_sf(xlim = c(-125, -113), ylim = c(32, 42)) +
+  labs(title = "Annual Precipitation in California (WorldClim v2.1)") +
+  theme_minimal()
+
+
 ```
 
 
