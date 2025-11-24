@@ -1,6 +1,6 @@
-﻿Population,Precip_mm
-ANGELO,1780
-MCL,757
-BORR,603
-SEDG,380
-WWP,320
+﻿Population,Precip_mm,precip_dif
+ANGELO,1780,1270
+MCL,757,247
+BORR,603,93
+SEDG,380,-130
+WWP,320,-190

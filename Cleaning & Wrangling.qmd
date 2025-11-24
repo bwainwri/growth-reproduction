@@ -51,8 +51,14 @@ library(terra)
 library(broom)
 library(tidyverse)
 library(sf)
-library(rnaturalearth)
 library(geodata)
+library(terra)
+library(tigris)
+library(ggnewscale)
+library(scatterpie)
+library(lmtest)
+library(car)
+library(bbmle)
 ```
 
 ## CA Map and Plant Comp
@@ -62,12 +68,6 @@ Make a map of California with the inside of the boundary as a heat map of an ari
 Precip data from WorlClim
 
 ```{r}
-
-library(terra)
-library(sf)
-library(ggplot2)
-library(geodata)
-library(tigris)
 
 # ----- climate data -----
 ppt <- worldclim_global(var = "prec", res = 5, path = "data/")
@@ -98,7 +98,6 @@ ggplot(ppt_df) +
 ```
 
 ```{r}
-#| eval: false
 ## Need the pie chart data to have the following columns: ID, Lat, Long, Sp1 proportion, Sp2 proportion, etc.
 
 # so we need to pivot wider the dataset and average across ten plots and add coordaintes for each site then use mapPies function
@@ -115,7 +114,7 @@ comp_sum <- plant_comp %>%
 comp_sum <- comp_sum %>%
   filter(!Species %in% c("Litter","Rock","Bare ground")) %>% 
   group_by(Site) %>% 
-  arrange(desc(avg_c), .by_group = TRUE)
+  arrange(desc(avg_cov), .by_group = TRUE)
 
 PlList_2023 <- read_csv("USDA Drought Project 2023 Plant List.csv")
 pl_list <- PlList_2023 %>% 
@@ -141,9 +140,6 @@ comp_wide <- comp_reduced %>%
 ## add lat and long columns
 comp_wide$lat <- c(39.75141,37.37914,38.87508,34.70243,34.91771)
 comp_wide$long <- c(-123.6302,-121.72841,-122.42114,-120.0545,-119.16882)
-
-install.packages("ggnewscale")
-library(ggnewscale)
 
 comp_wide[is.na(comp_wide)] <- 0
 colors <- rainbow_hcl(37)
@@ -242,9 +238,9 @@ scale_fill_manual(
   labs(title = "Annual Precipitation in California (WorldClim v2.1)") +
   theme_minimal()
 
-
+# Remove california border from pie charts
+# Spread out WWP and Sedgwick
 ```
-
 
 ## Reproductive allocation & End of Season biomass
 
@@ -925,9 +921,176 @@ ggplot(repro_summary_2, aes(x = factor(Precip_mm, level=c('1780','757','603','38
 ggsave("Slope_Pop_Native.jpg")
 ```
 
-No clear pattern here. Would need to see which species are driving these peaks and velleys.
+No clear pattern here. Look at tukey comparisons. Would need to see which species are driving these peaks and valleys.
 
-Try it again with distance from common garden.
+Try it again with distance from common garden. Try grasses vs forbs for both x axis. Try native rating too. Also look at model fit for which factors are best predictors. Could also look at drought index of home sites versus davis
+
+to-do list:
+- Do anova looking at slope of native vs non native by precipitation
+- Repeat bar graph and anova with grasses v forbs
+- Repeat bar graph and anova using native, non-native, and invasive
+- Do model comparison using population, precipitation, precip dif, Native status, Rating, growth habit, North-South
+
+```{r}
+head(repro_fill_hi_n_narm)
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Growth_Habit, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln:Population:Growth_Habit, data = repro_fill_hi_n_narm)
+str(mod)
+
+std_err <- summary(mod)$coefficients[, 2]
+coefficients(mod)
+cf <- coefficients(mod)
+str(cf)
+cf[1]
+cf[2]
+
+repro_summary <- repro_fill_hi_n %>% 
+  group_by(Population,Growth_Habit) %>% 
+  summarise(slope = NA,
+            std_err = NA)
+
+## should also include std error
+
+repro_summary[repro_summary$Population == 'ANGELO' & repro_summary$Growth_Habit == 'Forb',3] <- cf["Veg_Mass_ln:PopulationANGELO:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'ANGELO' & repro_summary$Growth_Habit == 'Forb',4] <- std_err["Veg_Mass_ln:PopulationANGELO:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'ANGELO' & repro_summary$Growth_Habit == 'Grass',3] <- cf["Veg_Mass_ln:PopulationANGELO:Growth_HabitGrass"]
+
+repro_summary[repro_summary$Population == 'ANGELO' & repro_summary$Growth_Habit == 'Grass',4] <- std_err["Veg_Mass_ln:PopulationANGELO:Growth_HabitGrass"]
+
+repro_summary[repro_summary$Population == 'MCL' & repro_summary$Growth_Habit == 'Forb',3] <- cf["Veg_Mass_ln:PopulationMCL:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'MCL' & repro_summary$Growth_Habit == 'Forb',4] <- std_err["Veg_Mass_ln:PopulationMCL:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'MCL' & repro_summary$Growth_Habit == 'Grass',3] <- cf["Veg_Mass_ln:PopulationMCL:Growth_HabitGrass"]
+
+repro_summary[repro_summary$Population == 'MCL' & repro_summary$Growth_Habit == 'Grass',4] <- std_err["Veg_Mass_ln:PopulationMCL:Growth_HabitGrass"]
+
+repro_summary[repro_summary$Population == 'BORR' & repro_summary$Growth_Habit == 'Forb',3] <- cf["Veg_Mass_ln:PopulationBORR:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'BORR' & repro_summary$Growth_Habit == 'Forb',4] <- std_err["Veg_Mass_ln:PopulationBORR:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'BORR' & repro_summary$Growth_Habit == 'Grass',3] <- cf["Veg_Mass_ln:PopulationBORR:Growth_HabitGrass"]
+
+repro_summary[repro_summary$Population == 'BORR' & repro_summary$Growth_Habit == 'Grass',4] <- std_err["Veg_Mass_ln:PopulationBORR:Growth_HabitGrass"]
+
+repro_summary[repro_summary$Population == 'SEDG' & repro_summary$Growth_Habit == 'Forb',3] <- cf["Veg_Mass_ln:PopulationSEDG:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'SEDG' & repro_summary$Growth_Habit == 'Forb',4] <- std_err["Veg_Mass_ln:PopulationSEDG:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'SEDG' & repro_summary$Growth_Habit == 'Grass',3] <- cf["Veg_Mass_ln:PopulationSEDG:Growth_HabitGrass"]
+
+repro_summary[repro_summary$Population == 'SEDG' & repro_summary$Growth_Habit == 'Grass',4] <- std_err["Veg_Mass_ln:PopulationSEDG:Growth_HabitGrass"]
+
+repro_summary[repro_summary$Population == 'WWP' & repro_summary$Growth_Habit == 'Forb',3] <- cf["Veg_Mass_ln:PopulationWWP:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'WWP' & repro_summary$Growth_Habit == 'Forb',4] <- std_err["Veg_Mass_ln:PopulationWWP:Growth_HabitForb"]
+
+repro_summary[repro_summary$Population == 'WWP' & repro_summary$Growth_Habit == 'Grass',3] <- cf["Veg_Mass_ln:PopulationWWP:Growth_HabitGrass"]
+
+repro_summary[repro_summary$Population == 'WWP' & repro_summary$Growth_Habit == 'Grass',4] <- std_err["Veg_Mass_ln:PopulationWWP:Growth_HabitGrass"]
+
+# add std error bars
+
+precip <- read_csv("Site_Precip.csv")
+precip$Precip_mm <- as.factor(precip$Precip_mm)
+repro_summary_2 <- left_join(repro_summary,precip, by = join_by("Population"))
+
+ggplot(repro_summary_2, aes(x = factor(Precip_mm, level=c('1780','757','603','380','320')), y = slope, fill = Growth_Habit)) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_errorbar(aes(ymin=slope-std_err, ymax=slope+std_err), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_bw() +
+   theme(
+    legend.text = element_text(size = 25),
+    axis.text=element_text(size=16),
+    axis.title=element_text(size=25),
+    legend.position = "bottom"
+  ) +
+  scale_fill_manual(values = c("Forb" = "#440154FF", "Grass" = "#5DC863FF")) +
+  labs(x = "Average Annual Precipitation (mm)",
+       y = "Slope of log(V) and log(R)",
+       fill = "")
+
+ggsave("Slope_Pop_Growth.jpg")
+
+```
+Also no clear pattern.
+
+Now look at model comparison using population, precipitation, precip dif, Native status, Rating, growth habit, North-South.
+ I wonder if the y variable can be the ratio between log?V and log?R, like where the point falls.
+ 
+ 
+Question: How do you examine degree of influence of different species or populations?
+
+```{r}
+precip$Precip_mm <- as.numeric(precip$Precip_mm)
+repro_fill_hi_n_narm <- left_join(repro_fill_hi_n_narm,precip, by = join_by("Population"))
+
+
+m0 <- glm(total_fl_mass_ln ~ 1, family = gaussian, data = repro_fill_hi_n_narm)
+m1 <- glm(total_fl_mass_ln ~ Veg_Mass_ln, family = gaussian, data = repro_fill_hi_n_narm)
+m2 <- glmer(total_fl_mass_ln ~ Veg_Mass_ln + (1|Block), family = gaussian, data = repro_fill_hi_n_narm)
+
+ICtab(m0,m1,m2)
+
+m_v_p <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Population, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_vxp <- glm(total_fl_mass_ln ~ Veg_Mass_ln*Population, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_v_pr <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Precip_mm.y, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_vxpr <- glm(total_fl_mass_ln ~ Veg_Mass_ln*Precip_mm.y, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_v_pd <- glm(total_fl_mass_ln ~ Veg_Mass_ln + precip_dif.y, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_vxpd <- glm(total_fl_mass_ln ~ Veg_Mass_ln*precip_dif.y, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_v_n <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Native_Status, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_vxn <- glm(total_fl_mass_ln ~ Veg_Mass_ln*Native_Status, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_v_r <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Rating, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_vxr <- glm(total_fl_mass_ln ~ Veg_Mass_ln*Rating, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_v_g <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Growth_Habit, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_vxg <- glm(total_fl_mass_ln ~ Veg_Mass_ln*Growth_Habit, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_v_s <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Scientific_Name, family = gaussian, data = repro_fill_hi_n_narm)
+
+m_vxs <- glm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, family = gaussian, data = repro_fill_hi_n_narm)
+
+ICtab(m0,
+      m1,
+      m2,
+      m_v_p,
+      m_vxp,
+      m_v_pr,
+      m_vxpr,
+      m_v_pd,
+      m_vxpd,
+      m_v_n,
+      m_vxn,
+      m_v_r,
+      m_vxr,
+      m_v_g,
+      m_vxg,
+      m_v_s,
+      m_vxs)
+lrtest(m_mons_max, m3)
+Anova(m_mons_max)
+summary(m_mons_max)
+#mall
+
+# Check for overdispersion
+# deviance/residual df
+10314.2/27751 
+```
+Overwhelmingly the model that uses species as an explanaotry variable is best. The invasive native question would be better investigated with traits. 
 
 ## Relative Growth Rate
 
@@ -1106,18 +1269,35 @@ rgr_hlv2 <- rgr_hlv %>%
   )
 
 ## Wooooo we did it!
-## Now just need to address outliers and re-run
 ## Some values have -Inf, investigate that at some point. For now you're done!
 ```
 
 ### Exploratory Graphs
 We have height, leaf number, area, and volume
 
+```{r}
+rgr_hlv2_long <- rgr_hlv2 %>% 
+  pivot_longer(cols = c("rgr_h_FM":"rgr_v_MJ"),
+               names_to = "var_mo",
+               values_to = "rate") %>%
+  filter(!is.na(rate))
 
+rgr_sum <- rgr_hlv2_long %>%
+  filter(!rate %in% c("-Inf","NaN","Inf")) %>% 
+  group_by(var_mo) %>% 
+  summarise(avg = mean(rate),
+            stdev = sd(rate)) %>% 
+  arrange(desc(avg))
+```
+
+Highest growth rate for volume is Feb-Mar (0.0957), then Mar-Apr (0.0827). For height, highest growth rate is Mar-Apr (0.0405), then Feb-Mar (0.0367). For leaves, highest growth rate is 0.0291 in Feb-Mar, then May-Jun 0.0198 (seems wrong). 
+Interested in graphs for sure and population differences for sure but I think keep moving.
 
 
 ### Select Reference times
-One predictive variable of allometric slope might be relative growth rate timing and/or maximum relative growth rate.
+One predictive variable of allometric slope might be relative growth rate timing and/or maximum relative growth rate. 
+
+Highest growth rate for volume is Feb-Mar (0.0957), then Mar-Apr (0.0827). For height, highest growth rate is Mar-Apr (0.0405), then Feb-Mar (0.0367). For leaves, highest growth rate is 0.0291 in Feb-Mar, then May-Jun 0.0198 (seems wrong).
 
 ## Photosynthetic Rate
 
