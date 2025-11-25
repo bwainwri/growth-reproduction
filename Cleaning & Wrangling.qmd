@@ -1017,7 +1017,7 @@ ggplot(repro_summary_2, aes(x = factor(Precip_mm, level=c('1780','757','603','38
 ggsave("Slope_Pop_Growth.jpg")
 
 ```
-Also no clear pattern.
+Also no clear pattern. "It seems like for forbs they are conservative from southern populations and aggressive from northern and grasses (except BROMAD), they are aggressive from the south and conservative from the north?" -- this pattern only play out among species in multiple populations, and it's relative to where they are. How might I capture that?
 
 Now look at model comparison using population, precipitation, precip dif, Native status, Rating, growth habit, North-South.
  I wonder if the y variable can be the ratio between log?V and log?R, like where the point falls.
@@ -1040,13 +1040,13 @@ m_v_p <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Population, family = gaussian, dat
 
 m_vxp <- glm(total_fl_mass_ln ~ Veg_Mass_ln*Population, family = gaussian, data = repro_fill_hi_n_narm)
 
-m_v_pr <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Precip_mm.y, family = gaussian, data = repro_fill_hi_n_narm)
+m_v_pr <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Precip_mm, family = gaussian, data = repro_fill_hi_n_narm)
 
-m_vxpr <- glm(total_fl_mass_ln ~ Veg_Mass_ln*Precip_mm.y, family = gaussian, data = repro_fill_hi_n_narm)
+m_vxpr <- glm(total_fl_mass_ln ~ Veg_Mass_ln*Precip_mm, family = gaussian, data = repro_fill_hi_n_narm)
 
-m_v_pd <- glm(total_fl_mass_ln ~ Veg_Mass_ln + precip_dif.y, family = gaussian, data = repro_fill_hi_n_narm)
+m_v_pd <- glm(total_fl_mass_ln ~ Veg_Mass_ln + precip_dif, family = gaussian, data = repro_fill_hi_n_narm)
 
-m_vxpd <- glm(total_fl_mass_ln ~ Veg_Mass_ln*precip_dif.y, family = gaussian, data = repro_fill_hi_n_narm)
+m_vxpd <- glm(total_fl_mass_ln ~ Veg_Mass_ln*precip_dif, family = gaussian, data = repro_fill_hi_n_narm)
 
 m_v_n <- glm(total_fl_mass_ln ~ Veg_Mass_ln + Native_Status, family = gaussian, data = repro_fill_hi_n_narm)
 
@@ -1081,16 +1081,16 @@ ICtab(m0,
       m_vxg,
       m_v_s,
       m_vxs)
-lrtest(m_mons_max, m3)
-Anova(m_mons_max)
-summary(m_mons_max)
+#lrtest(m_mons_max, m3)
+#Anova(m_mons_max)
+#summary(m_mons_max)
 #mall
 
 # Check for overdispersion
 # deviance/residual df
-10314.2/27751 
+#10314.2/27751 
 ```
-Overwhelmingly the model that uses species as an explanaotry variable is best. The invasive native question would be better investigated with traits. 
+Overwhelmingly the model that uses species as an explanatory variable is best. The invasive native question would be better investigated with traits. 
 
 ## Relative Growth Rate
 
@@ -1293,11 +1293,136 @@ rgr_sum <- rgr_hlv2_long %>%
 Highest growth rate for volume is Feb-Mar (0.0957), then Mar-Apr (0.0827). For height, highest growth rate is Mar-Apr (0.0405), then Feb-Mar (0.0367). For leaves, highest growth rate is 0.0291 in Feb-Mar, then May-Jun 0.0198 (seems wrong). 
 Interested in graphs for sure and population differences for sure but I think keep moving.
 
-
 ### Select Reference times
 One predictive variable of allometric slope might be relative growth rate timing and/or maximum relative growth rate. 
 
 Highest growth rate for volume is Feb-Mar (0.0957), then Mar-Apr (0.0827). For height, highest growth rate is Mar-Apr (0.0405), then Feb-Mar (0.0367). For leaves, highest growth rate is 0.0291 in Feb-Mar, then May-Jun 0.0198 (seems wrong).
+
+### Explore RGR
+
+```{r}
+rgr_hlv2
+
+# parse out plant ID for species, plot, Population
+plots <- read_csv("Plot_info copy.csv")
+str(plots)
+summary(plots)
+head(plots)
+
+spp <- read_csv("Species Codes copy.csv")
+unique(spp$Sp_Code)
+unique(repro$Species)
+
+# need to pull out first two characters in string of plant ID to create a "plot" column
+
+rgr_hlv <- rgr_hlv2 %>% 
+  mutate(Plot = substr(Plant_ID, start = 1, stop = 2),
+         Species = substr(Plant_ID, start = 4, stop = 9))
+unique(rgr_hlv$Plot)
+unique(rgr_hlv$Species)
+
+rgr_hlv_full <- left_join(rgr_hlv,plots,by = join_by(Plot))
+
+rgr_hlv_full$Sp_Code <- rgr_hlv$Species
+
+rgr_hlv_full <- left_join(rgr_hlv_full,spp,by = join_by(Sp_Code))
+
+rgr_h <- rgr_hlv_full %>% 
+  select(
+    Plant_ID,
+    Sp_Code,
+    Scientific_Name,
+    Native_Status,
+    Growth_Habit,
+    Rating,
+    Source,
+    Plot,
+    Block,
+    Shelter,
+    Plot_number,
+    Population,
+    Treatment,
+    rgr_h_FM,
+    rgr_h_MA,
+    rgr_h_AM,
+    rgr_h_MJ
+  ) %>% 
+  pivot_longer(cols = c("rgr_h_FM":"rgr_h_MJ"),
+               names_to = "var_mo",
+               values_to = "rate")
+
+rgr_l <- rgr_hlv_full %>% 
+  select(
+    Plant_ID,
+    Sp_Code,
+    Scientific_Name,
+    Native_Status,
+    Growth_Habit,
+    Rating,
+    Source,
+    Plot,
+    Block,
+    Shelter,
+    Plot_number,
+    Population,
+    Treatment,
+    rgr_l_FM,
+    rgr_l_MA,
+    rgr_l_AM,
+    rgr_l_MJ
+  ) %>% 
+  pivot_longer(cols = c("rgr_l_FM":"rgr_l_MJ"),
+               names_to = "var_mo",
+               values_to = "rate")
+
+rgr_v <- rgr_hlv_full %>% 
+  select(
+    Plant_ID,
+    Sp_Code,
+    Scientific_Name,
+    Native_Status,
+    Growth_Habit,
+    Rating,
+    Source,
+    Plot,
+    Block,
+    Shelter,
+    Plot_number,
+    Population,
+    Treatment,
+    rgr_v_FM,
+    rgr_v_MA,
+    rgr_v_AM,
+    rgr_v_MJ
+  ) %>% 
+  pivot_longer(cols = c("rgr_v_FM":"rgr_v_MJ"),
+               names_to = "var_mo",
+               values_to = "rate")
+```
+
+Start graphing, what do I want to see? growth rate by rating or native status across months
+```{r}
+# Change violin plot colors by groups
+ggplot(rgr_h, aes(x=var_mo, y=rate, fill=Rating)) +
+  geom_violin()
+ggplot(rgr_h, aes(x=var_mo, y=rate, fill=Native_Status)) +
+  geom_violin()
+
+ggplot(rgr_l, aes(x=var_mo, y=rate, fill=Rating)) +
+  geom_violin()
+ggplot(rgr_l, aes(x=var_mo, y=rate, fill=Native_Status)) +
+  geom_violin()
+
+ggplot(rgr_v, aes(x=var_mo, y=rate, fill=Rating)) +
+  geom_violin()
+ggplot(rgr_v, aes(x=var_mo, y=rate, fill=Native_Status)) +
+  geom_violin()
+
+
+```
+Should almost look at each of these graphs by population, so it's limited to community. It's possible an invasive from Angelo has the same growth rate as a native from santa barbara.
+
+
 
 ## Photosynthetic Rate
 
