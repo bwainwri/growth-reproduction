@@ -59,6 +59,7 @@ library(scatterpie)
 library(lmtest)
 library(car)
 library(bbmle)
+library(cropgrowdays)
 ```
 
 ## CA Map and Plant Comp
@@ -573,6 +574,7 @@ ggsave("Allom_log_plot_BRODIA.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_BRODIA))
 ```
+I wonder what would happen if we removed that rogue sample for SEDG
 
 ```{r}
 repro_BROHOR <- repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Sp_Code == "BROHOR"),]
@@ -1402,16 +1404,29 @@ rgr_v <- rgr_hlv_full %>%
 
 Start graphing, what do I want to see? growth rate by rating or native status across months
 ```{r}
+# Order Invasive rating: Native, Non-native, Limited, Moderate, High
+# Order Month rates
+
+rgr_h$Rating<- factor(rgr_h$Rating, levels = c("Native", "Non-native","Limited","Moderate","High"))
+rgr_h$var_mo<- factor(rgr_h$var_mo, levels = c("rgr_h_FM", "rgr_h_MA","rgr_h_AM","rgr_h_MJ"))
+
 # Change violin plot colors by groups
 ggplot(rgr_h, aes(x=var_mo, y=rate, fill=Rating)) +
   geom_violin()
 ggplot(rgr_h, aes(x=var_mo, y=rate, fill=Native_Status)) +
   geom_violin()
 
+
+rgr_l$Rating<- factor(rgr_l$Rating, levels = c("Native", "Non-native","Limited","Moderate","High"))
+rgr_l$var_mo<- factor(rgr_l$var_mo, levels = c("rgr_l_FM", "rgr_l_MA","rgr_l_AM","rgr_l_MJ"))
+
 ggplot(rgr_l, aes(x=var_mo, y=rate, fill=Rating)) +
   geom_violin()
 ggplot(rgr_l, aes(x=var_mo, y=rate, fill=Native_Status)) +
   geom_violin()
+
+rgr_v$Rating<- factor(rgr_v$Rating, levels = c("Native", "Non-native","Limited","Moderate","High"))
+rgr_v$var_mo<- factor(rgr_v$var_mo, levels = c("rgr_v_FM", "rgr_v_MA","rgr_v_AM","rgr_v_MJ"))
 
 ggplot(rgr_v, aes(x=var_mo, y=rate, fill=Rating)) +
   geom_violin()
@@ -1422,13 +1437,63 @@ ggplot(rgr_v, aes(x=var_mo, y=rate, fill=Native_Status)) +
 ```
 Should almost look at each of these graphs by population, so it's limited to community. It's possible an invasive from Angelo has the same growth rate as a native from santa barbara.
 
+```{r}
+rgr_h_ACR <- rgr_h %>% 
+  filter(Population == "ANGELO")
 
+rgr_h_MCL <- rgr_h %>% 
+  filter(Population == "MCL")
+
+rgr_h_BORR <- rgr_h %>% 
+  filter(Population == "BORR")
+
+rgr_h_SEDG <- rgr_h %>% 
+  filter(Population == "SEDG")
+
+# Change violin plot colors by groups
+ggplot(rgr_h_ACR, aes(x=var_mo, y=rate, fill=Rating)) +
+  geom_violin()
+ggplot(rgr_h_ACR, aes(x=var_mo, y=rate, fill=Native_Status)) +
+  geom_violin()
+
+ggplot(rgr_h_MCL, aes(x=var_mo, y=rate, fill=Rating)) +
+  geom_violin()
+ggplot(rgr_h_MCL, aes(x=var_mo, y=rate, fill=Native_Status)) +
+  geom_violin()
+
+ggplot(rgr_h_BORR, aes(x=var_mo, y=rate, fill=Rating)) +
+  geom_violin()
+ggplot(rgr_h_BORR, aes(x=var_mo, y=rate, fill=Native_Status)) +
+  geom_violin()
+
+ggplot(rgr_h_SEDG, aes(x=var_mo, y=rate, fill=Rating)) +
+  geom_violin()
+ggplot(rgr_h_SEDG, aes(x=var_mo, y=rate, fill=Native_Status)) +
+  geom_violin()
+
+ggplot(rgr_l, aes(x=var_mo, y=rate, fill=Rating)) +
+  geom_violin()
+ggplot(rgr_l, aes(x=var_mo, y=rate, fill=Native_Status)) +
+  geom_violin()
+
+
+
+ggplot(rgr_v, aes(x=var_mo, y=rate, fill=Rating)) +
+  geom_violin()
+ggplot(rgr_v, aes(x=var_mo, y=rate, fill=Native_Status)) +
+  geom_violin()
+```
+These graphs should give us clues about invasive coverage and niche dynamics and competition within each plot.
+
+Now curious how these relate to reproductive allocation/scaling
+
+Remember we didn't know who each grass was in February. So might need to throw those out OR separate by growth habit.
 
 ## Photosynthetic Rate
 
 ```{r}
 #| warning: false
-
+#| message: false
 # how to tell it the header and which rows to skip
 # how to read through the filenames in a certain folder and make a list and then read those in 1 by 1
 getwd()
@@ -1470,6 +1535,8 @@ avebar = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projec
               known.distance = 3,
               log = TRUE)
 avebar<-avebar$summary
+
+?run.ij
 
 broare = run.ij(set.directory = "/Users/brookewainwright/Documents/GitHub_Projects/growth-reproduction/Licor Leaf Area copy/BROARE",
               distance.pixel = 355,
@@ -1736,6 +1803,17 @@ licor$Plant_ID <- toupper(licor$`plant id`)
 licor2 <- left_join(licor,leaf_licor_area,by=c("Plant_ID" = "Plant_ID"))
 
 # Come back and investigate NAs for licor2 -- why are some leaf areas missing
+licor.na <- licor2 %>% 
+  filter(is.na(total.leaf.area))
+
+unique(licor.na$Plant_ID)
+licor2[which(licor2$Plant_ID == "E4.PHATAN.2-E2"),]
+# AIRCAR, ACMPAR is not present
+# For some reason the ones with dashes aren't lining up
+# A4 BROHOR has no match but it shouldn't because there was no brohor in wwp -- should be a3
+# E8 CENMEL doesn't have a match but it shouldnt because CENMEL should be in e5 or e6
+# Such a mess, think about just taking off the number at the end
+# Come back to this
 
 # multiply focal data by leaf area fraction
 licor2$leaf_ratio <- 6/licor2$total.leaf.area
@@ -1760,21 +1838,177 @@ licor2[which(licor2$gsw_adj < 0.03),]
 
 
 # average licor data by plant_id
-
-
+licor3 <- licor2 %>% 
+  group_by(Plant_ID) %>% 
+  summarise(A_adj_av = mean(A_adj, na.rm=TRUE),
+            WUE_adj_av= mean(WUE_adj, na.rm = TRUE),
+            E_adj_av=mean(E_adj, na.rm = TRUE),
+            Ci_adj_av = mean(Ci_adj, na.rm = TRUE),
+            gsw_adj_av = mean(gsw_adj, na.rm = TRUE))
 
 # extract species and plot from plant id
+licor3$Sp_Code <- substr(licor3$Plant_ID,4,9)
+licor3$Plot <- substr(licor3$Plant_ID,1,2)
+
+# merge with plot and species info
+licor4 <- left_join(licor3,plots, by = join_by(Plot))
+licor5 <- left_join(licor4,spp, by = join_by(Sp_Code))
+```
+
+### Explore licor
+```{r}
+summary(licor5)
+# okay some things are way off with WUE, and others -- will need to deal with outliers at some point
+
+p <- ggplot(licor5, aes(x=Sp_Code, y=A_adj_av)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+p
+
+p <- ggplot(licor5, aes(x=Rating, y=A_adj_av)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+p
 
 ```
 
 
 ## Leaf Mass Area
+```{r}
+lf_area <- read_csv("LMA_lfarea_all.csv")
+
+## Extract plant id, species, plot
+lf_area$Date <- as.Date(substr(lf_area$sample, start=11, stop=18), "%Y%m%d")
+
+# separate plant ID from same and add periods to plant id
+lf_area$Plant_ID <- substr(lf_area$sample, start=1,stop=9)
+lf_area$Plant_ID <- paste0(
+  substr(lf_area$Plant_ID, 1, 2),
+  ".",
+  substr(lf_area$Plant_ID, 3, nchar(lf_area$Plant_ID))
+)
+lf_area$Plant_ID
+
+lf_area$Plant_ID <- paste0(
+  substr(lf_area$Plant_ID, 1, 9),
+  ".",
+  substr(lf_area$Plant_ID, 10, nchar(lf_area$Plant_ID))
+)
+lf_area$Plant_ID
+
+lf_area$Sp_Code <- substr(lf_area$Plant_ID,4,9)
+lf_area$Plot <- substr(lf_area$Plant_ID,1,2)
+
+# merge with plot and species info
+lf_area2 <- left_join(lf_area,plots, by = join_by(Plot))
+lf_area3 <- left_join(lf_area2,spp, by = join_by(Sp_Code))
+
+# Now merge with leaf mass and calculate LMA
+mass <- read_csv("Leaf Mass_2023_20231009.csv")
+head(mass)
+
+LMA <- left_join(lf_area3,mass, by = join_by(Plant_ID))
+# LMA is measured in g/m^2
+
+LMA$area_m2 <- LMA$total.leaf.area/10000
+LMA$lma_g_m2 <- LMA$area_m2/LMA$Dry_leaf_mass_g
+
+```
+
+### Explore LMA
+```{r}
+summary(LMA)
+# okay some things are way off with WUE, and others -- will need to deal with outliers at some point
+
+ggplot(LMA, aes(x=Sp_Code, y=lma_g_m2)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+
+ggplot(LMA, aes(x=Rating, y=lma_g_m2)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+```
 
 ## Leaf Area
+```{r}
+lf_area3
+
+summary(lf_area3)
+
+ggplot(lf_area3, aes(x=Sp_Code, y=total.leaf.area)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+ggplot(lf_area3, aes(x=Rating, y=total.leaf.area)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+```
+
 
 ## WUE
 
+```{r}
+summary(licor5)
+
+licor_sanSTIPULELYCAP <- licor5 %>% 
+  filter(!Sp_Code %in% c("STIPUL","ELYCAP"))
+ggplot(licor_sanSTIPULELYCAP, aes(x=Sp_Code, y=WUE_adj_av)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+ggplot(licor_sanSTIPULELYCAP, aes(x=Rating, y=WUE_adj_av)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+# What are normal ranges for WUE?
+
+```
+
 ## Height
+```{r}
+head(rgr2)
+rgr_h <- rgr2 %>% 
+  select(
+    Plant_ID,
+    Month,
+    Height_cm,
+    Sp_Code,
+    Plot,
+    Block,
+    Shelter,
+    Plot_number,
+    Population,
+    Treatment
+  )
+
+rgr_max_h <- rgr_h %>% 
+  group_by(Plant_ID) %>% 
+  summarise(h_max = max(Height_cm, na.rm = TRUE),
+            Sp_Code = Sp_Code,
+            Plot = Plot,
+            Population = Population,
+            Treatment = Treatment
+            ) 
+rgr_max_h <- rgr_max_h[-which(duplicated(rgr_max_h)),]
+
+
+rgr_max_h2 <- left_join(rgr_max_h,plots, by = join_by(Plot))
+rgr_max_h3 <- left_join(rgr_max_h2,spp, by = join_by(Sp_Code))
+
+ggplot(rgr_max_h3, aes(x=Sp_Code, y=h_max)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+ggplot(rgr_max_h3, aes(x=Rating, y=h_max)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+
+
+```
 
 ## Leaf Nitrogen
 
@@ -1783,14 +2017,14 @@ cn <- read_csv("CN_2023.csv")
 str(cn)
 
 # break out species from sample ID
-cn$sp <- substr(cn$Sample_ID,4,9)
+cn$Sp_Code <- substr(cn$Sample_ID,4,9)
 
-sp_n <- count(cn, "sp")
+sp_n <- count(cn, "Sp_Code")
 sp_n[which(sp_n$freq < 4),1]
 sp_rm <- sp_n[which(sp_n$freq < 4),1] 
 
 cn <- cn %>% 
-  filter(!sp %in% sp_rm)
+  filter(!Sp_Code %in% sp_rm)
 
 str(cn)
 
@@ -1820,9 +2054,77 @@ n_outliers <- cn_avgs[which(cn_avgs$Total_N_µg > cn_avgs$n_max | cn_avgs$Total_
 n15_outliers <- cn_avgs[which(cn_avgs$δ15NAir_permil > cn_avgs$n15_max | cn_avgs$δ15NAir_permil < cn_avgs$n15_min),c("Sample_ID","sp", "δ15NAir_permil","mean_n15","std_n15","n15_max","n15_min")]
 
 ```
+### create & explore
+```{r}
+# I think I need to calculate %N using the total N in micro grams divided by sample weight
+cn$Total_N_mg <- cn$Total_N_µg/1000
 
+cn$N_per <- (cn$Total_N_mg/cn$Sample_Weight_mg_from_Sample_List)*100
+
+cn3 <- left_join(cn,spp, by = join_by(Sp_Code))
+
+ggplot(cn3, aes(x=Sp_Code, y=N_per)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+ggplot(cn3, aes(x=Rating, y=N_per)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+# Need to create Plant_ID for merging
+cn3$Plant_ID <- substr(cn3$Sample_ID, start=1,stop=11)
+cn3$Plant_ID <- paste0(
+  substr(cn3$Plant_ID, 1, 2),
+  ".",
+  substr(cn3$Plant_ID, 4, 9),
+  ".",
+  substr(cn3$Plant_ID, 11, 11)
+)
+cn3$Plant_ID
+
+cn3$Plot <- substr(cn3$Plant_ID, 1, 2)
+cn3$Plot
+
+cn2 <- left_join(cn3,plots,by=join_by("Plot"))
+
+```
 
 ## Date of first flower
+```{r}
+pheno <- read_csv("Phenology_2023.csv")
+
+# Change date to date format
+str(pheno)
+pheno$Flower_Date <- as.Date(pheno$Flower_Date, tryFormats = "%m/%d/%y")
+
+# Change date into DOY
+pheno$doy <- day_of_year(pheno$Flower_Date)
+
+# Extract plot
+pheno$Plot <- substr(pheno$Plant_ID,1,2)
+pheno$Sp_Code <- pheno$Species
+
+# merge plot info and species info
+pheno2 <- left_join(pheno, plots, by=join_by("Plot"))
+pheno3 <- left_join(pheno2, spp, by=join_by("Sp_Code"))
+
+ggplot(pheno3, aes(x=Sp_Code, y=doy)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+
+ggplot(pheno3, aes(x=Rating, y=doy)) +
+  geom_violin() + stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") + theme(axis.text.x = element_text(angle=90,hjust = 1, size=14, color="black") )
+```
+
+## All trait analyses
+
+### Merge all traits
+
+### Correlation Table
+
+### PCA and/or NMDS
+
 
 ## Mid season biomass partial
 
