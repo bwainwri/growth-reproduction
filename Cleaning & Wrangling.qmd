@@ -239,6 +239,8 @@ scale_fill_manual(
   labs(title = "Annual Precipitation in California (WorldClim v2.1)") +
   theme_minimal()
 
+ggsave("CA_precip_comp_map.jpg")
+
 # Remove california border from pie charts
 # Spread out WWP and Sedgwick
 ```
@@ -482,10 +484,12 @@ repro_fill_hi_n_narm$total_fl_mass_ln <- log(repro_fill_hi_n_narm$total_fl_mass)
 
 repro_fill_hi_n_narm <- repro_fill_hi_n_narm[-(which(repro_fill_hi_n_narm$total_fl_mass_ln %in% c(NA, -Inf))),]
 
-ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name, linetype = Native_Status)) +
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name 
+# , linetype = Native_Status
+)) +
   geom_abline(intercept = 0, slope = 1) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
-  geom_smooth(method = "lm", fill = NA, size = 0.5) +
+  geom_smooth(method = "lm", fill = NA, size = 1) +
   # scale_color_viridis(discrete=TRUE) +
   theme_bw() +
   scale_linetype_manual(values = c("Native" = "dashed", "Non-native" = "solid")) +
@@ -497,6 +501,60 @@ ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = 
 
 ggsave("Allom_log_plot.jpg")
 
+# Can I put the slope next to each species name
+# test to see if slopes are significantly different from 0 and form each other
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, data = repro_fill_hi_n_narm))
+
+mod <- lmList(total_fl_mass_ln ~ Veg_Mass_ln | Scientific_Name, data = repro_fill_hi_n_narm)
+
+
+
+# Make plot larger/wider
+mod <- as.data.frame(summary(mod)$coefficients)
+
+sp_list <- sort(unique(repro_fill_hi_n_narm$Scientific_Name))
+mod$Scientific_Name <- sort(unique(repro_fill_hi_n_narm$Scientific_Name))
+new_spp <- left_join(spp,mod,by=join_by("Scientific_Name")) %>%
+  select(
+    Scientific_Name,
+    Estimate.Veg_Mass_ln
+  )
+
+repro_slopes <- left_join(repro_fill_hi_n_narm,new_spp, by=join_by("Scientific_Name")) %>% 
+  mutate(
+    Species = paste0(Scientific_Name,
+                     " ",
+                     substr(Estimate.Veg_Mass_ln,1,4)
+  )
+)
+
+ggplot(repro_slopes, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species 
+# , linetype = Native_Status
+)) +
+  geom_abline(intercept = 0, slope = 1) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA, size = 0.5) +
+  # scale_color_viridis(discrete=TRUE) +
+  theme_bw() +
+  scale_linetype_manual(values = c("Native" = "dashed", "Non-native" = "solid")) +
+  labs(x = "ln(Vegetative Biomass (g))",
+       y = "ln(Reproductive Biomass (g))") +
+  theme(axis.text.x = element_text(size=9),
+        legend.key.size = unit(0.5, "cm"),
+        legend.text= element_text(size = 9),
+        legend.title = element_text(size = 9),
+        legend.position = "bottom")
+
+
+ggsave("Allom_log_plot_slopes.jpg", height=9, width = 9)
+
+
+
+```
+
+
+```{r}
 ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name, linetype = Growth_Habit)) +
   geom_abline(intercept = 0, slope = 1) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
@@ -514,10 +572,47 @@ ggsave("Allom_log_plot_Growth.jpg")
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, data = repro_fill_hi_n_narm))
 
-# not sure what this is for
-mod <- lmList(total_fl_mass_ln ~ Veg_Mass_ln | Sp_Code, data = repro_fill_hi_n_narm)
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Scientific_Name, 
+          data = repro_fill_hi_n_narm)
 
+library(emmeans)
+
+slopes <- emtrends(mod, ~ Scientific_Name, var = "Veg_Mass_ln")
+slopes
+
+test_slopes_vs1 <- test(slopes, null = 1)
+test_slopes_vs1[which(test_slopes_vs1$p.value<0.05),]
+
+
+pairs(slopes)
 # anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Sp_Code, data = repro_fill_hi_n))
+
+pairs(slopes, adjust = "tukey")
+
+repro_dif <- repro_slopes %>% 
+  filter(
+    Scientific_Name %in% c("Amsinckia menziesii","Avena barbata","Avena fatua","Bromus diandrus","Bromus hordeaceaus"))
+
+ggplot(repro_dif, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species 
+# , linetype = Native_Status
+)) +
+  geom_abline(intercept = 0, slope = 1) +
+  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
+  geom_smooth(method = "lm", fill = NA, size = 1) +
+  # scale_color_viridis(discrete=TRUE) +
+  theme_bw() +
+  scale_linetype_manual(values = c("Native" = "dashed", "Non-native" = "solid")) +
+  labs(x = "ln(Vegetative Biomass (g))",
+       y = "ln(Reproductive Biomass (g))") +
+  theme(axis.text.x = element_text(size=15),
+        legend.text= element_text(size = 15),
+        legend.title = element_text(size = 15),
+        legend.position = "bottom")
+
+
+ggsave("Allom_log_plot_slopes_1.jpg", height=9, width = 15)
+
+
 
 ```
 
@@ -766,15 +861,42 @@ lmList(total_fl_mass_ln ~ Veg_Mass_ln | Population, data = repro_fill_hi_n_narm)
 Inspect functional type
 
 ```{r}
-ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit)) +
-  geom_abline(intercept = 0, slope = 1) +
-  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit, alpha = 0.5)) +
-  geom_smooth(method = "lm", fill = NA) +
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status)) +
+  #geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Native_Status, alpha = 0.5)) +
+   guides(alpha = "none") +
   theme_bw() +
+ geom_smooth(method = "lm", fill = NA) +
+  theme(
+    legend.text = element_text(size = 12.5),
+    legend.title = element_text(size = 12.5),
+    axis.text=element_text(size=8),
+    axis.title=element_text(size=12.5),
+    legend.position = "bottom"
+  ) +
+  scale_color_manual(values = c("Native" = "#440154FF", "Non-native" = "#5DC863FF")) +
+  labs(x = "ln(Vegetative Biomass (g))",
+       y = "ln(Reproductive Biomass (g))",
+       color = "")
+
+ggsave("Allom_log_plot_Native.jpg")
+
+
+
+
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit)) +
+  # geom_abline(intercept = 0, slope = 1) +
+  geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit, alpha = 0.5)) +
+  guides(alpha = "none") +
+  theme_bw() +
+  geom_smooth(method = "lm", fill = NA) +
+    theme(
+    legend.position = "bottom"
+  ) +
   scale_color_viridis(discrete=TRUE) +
   labs(x = "ln(Vegetative Biomass (g))",
-       y = "ln(Reproductive Biomass (g))") +
-  theme(axis.text.x = element_text(size=9))
+       y = "ln(Reproductive Biomass (g))")
+
 
 ggsave("Allom_log_plot_GrowthHab.jpg")
 
@@ -2029,7 +2151,7 @@ cn <- cn %>%
 str(cn)
 
 cn_sum <- cn %>% 
-  group_by(sp) %>%
+  group_by(Sp_Code) %>%
   dplyr::summarise(mean_c13 = mean(δ13CVPDB_permil),
                    std_c13 = sd(δ13CVPDB_permil),
                    mean_n = mean(Total_N_µg),
@@ -2045,13 +2167,13 @@ cn_sum <- cn_sum %>%
          n15_max = mean_n15 + 3*std_n15,
          n15_min = mean_n15 - 3*std_n15)
 
-cn_avgs <- left_join(cn, cn_sum, by=join_by("sp"))
+cn_avgs <- left_join(cn, cn_sum, by=join_by("Sp_Code"))
 
-c13_outliers <- cn_avgs[which(cn_avgs$δ13CVPDB_permil > cn_avgs$c13_max | cn_avgs$δ13CVPDB_permil < cn_avgs$c13_min),c("Sample_ID","sp", "δ13CVPDB_permil","mean_c13","std_c13","c13_max","c13_min")]
+c13_outliers <- cn_avgs[which(cn_avgs$δ13CVPDB_permil > cn_avgs$c13_max | cn_avgs$δ13CVPDB_permil < cn_avgs$c13_min),c("Sample_ID","Sp_Code", "δ13CVPDB_permil","mean_c13","std_c13","c13_max","c13_min")]
 
-n_outliers <- cn_avgs[which(cn_avgs$Total_N_µg > cn_avgs$n_max | cn_avgs$Total_N_µg < cn_avgs$n_min),c("Sample_ID","sp", "Total_N_µg","mean_n","std_n","n_max","n_min")]
+n_outliers <- cn_avgs[which(cn_avgs$Total_N_µg > cn_avgs$n_max | cn_avgs$Total_N_µg < cn_avgs$n_min),c("Sample_ID","Sp_Code", "Total_N_µg","mean_n","std_n","n_max","n_min")]
 
-n15_outliers <- cn_avgs[which(cn_avgs$δ15NAir_permil > cn_avgs$n15_max | cn_avgs$δ15NAir_permil < cn_avgs$n15_min),c("Sample_ID","sp", "δ15NAir_permil","mean_n15","std_n15","n15_max","n15_min")]
+n15_outliers <- cn_avgs[which(cn_avgs$δ15NAir_permil > cn_avgs$n15_max | cn_avgs$δ15NAir_permil < cn_avgs$n15_min),c("Sample_ID","Sp_Code", "δ15NAir_permil","mean_n15","std_n15","n15_max","n15_min")]
 
 ```
 ### create & explore
@@ -2120,10 +2242,190 @@ ggplot(pheno3, aes(x=Rating, y=doy)) +
 ## All trait analyses
 
 ### Merge all traits
+Reproductive allocation, `repro_fill_hi_n_narm`
+Relative growth rate height, lvs, volume, `rgr_hlv2`
+photosynthetic rate, gsw, WUE `licor5`
+max ht, `rgr_max_h3`
+Leaf Mass Area, Leaf Area, `LMA`
+Leaf nitrogen, `cn2`
+date of first flower, `pheno3`
+
+```{r}
+# take off last two characters from Plant_ID and merge by Plant_ID
+
+head(repro_fill_hi_n_narm)
+repro <- repro_fill_hi_n_narm %>% 
+  select(
+    Plant_ID,
+    Flower_Count,
+    Veg_Mass,
+    total_fl_mass,
+    Veg_Mass_ln,
+    total_fl_mass_ln
+  ) %>% 
+  mutate(
+    repro_allo = total_fl_mass/(Veg_Mass + total_fl_mass),
+    Plant_ID = substr(Plant_ID,1,9)
+  )
+
+head(rgr_hlv2)
+rgr <- rgr_hlv2 %>%
+  select(
+    Plant_ID,
+    rgr_h_MA,
+    rgr_l_MA,
+    rgr_v_MA
+  ) %>% 
+  mutate(
+    Plant_ID = substr(Plant_ID,1,9)
+  )
+
+head(licor5)
+licor <- licor5 %>% 
+  select(
+    Plant_ID,
+    A_adj_av,
+    WUE_adj_av,
+    E_adj_av,
+    Ci_adj_av,
+    gsw_adj_av
+  ) %>% 
+  mutate(
+    Plant_ID = substr(Plant_ID,1,9)
+  )
+
+head(rgr_max_h3)
+ht <- rgr_max_h3 %>% 
+  mutate(
+    h_max_cm = h_max
+  ) %>% 
+  select(
+    Plant_ID,
+    h_max_cm
+  ) %>% 
+  mutate(
+    Plant_ID = substr(Plant_ID,1,9)
+  )
+
+head(LMA)
+lma <- LMA %>% 
+  select(
+    Plant_ID,
+    area_m2,
+    lma_g_m2
+  ) %>% 
+  mutate(
+    Plant_ID = substr(Plant_ID,1,9)
+  )
+
+# figure out carbon 13
+head(cn2)
+cn <- cn2 %>% 
+  select(
+    Plant_ID,
+    N_per
+  ) %>% 
+  mutate(
+    Plant_ID = substr(Plant_ID,1,9)
+  )
+
+head(pheno3)
+pheno <- pheno3 %>% 
+  select(Plant_ID,
+         doy) %>% 
+  mutate(
+    Plant_ID = substr(Plant_ID,1,9)
+  )
+
+# merge and scale
+full <- full_join(repro,rgr,by=join_by("Plant_ID"))
+
+full2 <- full_join(full,licor,by=join_by("Plant_ID"))
+
+full3 <- full_join(full2,ht,by=join_by("Plant_ID"))
+
+full4 <- full_join(full3, lma,by=join_by("Plant_ID"))
+
+full5 <- full_join(full4, cn,by=join_by("Plant_ID"))
+
+full6 <- full_join(full5, pheno,by=join_by("Plant_ID"))
+
+```
 
 ### Correlation Table
 
 ### PCA and/or NMDS
+
+```{r}
+full6[which(is.na(full6$total_fl_mass)),]
+
+full6_narm <- full6 %>% 
+  filter(!is.na(total_fl_mass))
+
+full6_narm$h_max_cm
+# There are -Inf values in this column
+# force them to be NAs
+full6_narm[which(full6_narm$h_max_cm == "-Inf"), "h_max_cm"] <- NA
+
+full6_narm$h_max_cm
+
+full6_anon <- full6_narm %>% 
+  select(
+    !Plant_ID
+  )
+
+library(missMDA)
+nb <- estim_ncpPCA(full6_anon)
+full_imputed <- imputePCA(full6_anon, ncp = nb$ncp)$completeObs
+
+full_scaled <- scale(full_imputed)
+
+pca <- prcomp(full_scaled, center = TRUE, scale. = TRUE)
+
+# View summary
+summary(pca)
+
+# View loadings
+pca$rotation
+
+biplot(pca)
+
+pca_scores <- as.data.frame(pca$x)
+pca_scores$Plant_ID <- full6_narm$Plant_ID   
+# Add grouping variable
+pca_scores$Sp_Code <- substr(pca_scores$Plant_ID,4,9)
+pca_scores_2 <- left_join(pca_scores,spp, by=join_by("Sp_Code"))
+
+ggplot(pca_scores_2, aes(PC1, PC2, color = Native_Status)) +
+  geom_point(size = 3, alpha = 0.8) +
+  theme_minimal() +
+  labs(title = "PCA of Iris Dataset",
+       x = paste0("PC1 (", round(summary(pca)$importance[2,1] * 100, 1), "% variance)"),
+       y = paste0("PC2 (", round(summary(pca)$importance[2,2] * 100, 1), "% variance)"))
+
+
+# Install devtools if needed
+library(ggbiplot)
+
+ggbiplot(pca, groups = pca_scores_2$Native_Status, ellipse = TRUE, circle = TRUE) +
+  scale_color_discrete(name = "") +
+  theme_minimal()
+
+ggsave("pca_native.jpg")
+
+ggbiplot(pca, groups = pca_scores_2$Growth_Habit, ellipse = TRUE, circle = TRUE) +
+  scale_color_discrete(name = "") +
+  theme_minimal()
+
+ggsave("pca_growth.jpg")
+
+# Need to improve plots and reduce variables
+# Make points smaller
+
+
+# need to figure out if PCAs are used to model reproductive allocation and how to do that. How does a PCA interact with a dependent variable
+
+```
 
 
 ## Mid season biomass partial
