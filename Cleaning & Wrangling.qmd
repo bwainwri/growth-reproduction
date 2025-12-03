@@ -71,7 +71,7 @@ Precip data from WorlClim
 ```{r}
 
 # ----- climate data -----
-ppt <- worldclim_global(var = "prec", res = 5, path = "data/")
+ppt <- worldclim_global(var = "prec", res = 2.5, path = "data/")
 ppt_annual <- sum(ppt)
 
 # ----- California boundary -----
@@ -97,6 +97,7 @@ ggplot(ppt_df) +
 
 
 ```
+
 
 ```{r}
 ## Need the pie chart data to have the following columns: ID, Lat, Long, Sp1 proportion, Sp2 proportion, etc.
@@ -141,18 +142,38 @@ comp_wide <- comp_reduced %>%
 ## add lat and long columns
 comp_wide$lat <- c(39.75141,37.37914,38.87508,34.70243,34.91771)
 comp_wide$long <- c(-123.6302,-121.72841,-122.42114,-120.0545,-119.16882)
+comp_wide$long_move <- comp_wide$long - 2
+comp_wide$lat_move<- comp_wide$lat
+comp_wide$lat_move[4] <- comp_wide$lat[4] + 1
+comp_wide$lat_move[5] <- comp_wide$lat[5] - 1
+comp_wide$lat_move[1] <- comp_wide$lat[1] + 1
+comp_wide$lat_move[2] <- comp_wide$lat[2] - 0.5
+comp_wide$long_move[3] <- comp_wide$long[3] - 2.5
+comp_wide$lat_move[3] <- comp_wide$lat[3] - 0.25
+comp_wide$long_move[4] <- comp_wide$long[4] - 3.5
+comp_wide$lat_move[4] <- comp_wide$lat[4] + 0.1
+comp_wide$long_move[5] <- comp_wide$long[5] - 2.5
+comp_wide$lat_move[5] <- comp_wide$lat[5] - 1.5
+#comp_wide$long_move[1] <- comp_wide$long[1] + 0.2
+comp_wide
 
 comp_wide[is.na(comp_wide)] <- 0
 colors <- rainbow_hcl(37)
+
+
 # ----- plot -----
 ggplot() +
   geom_raster(data = ppt_df, aes(x = x, y = y, fill = ppt)) +
     scale_fill_viridis_c(name = "Annual precip (mm)") +
   new_scale_fill() +
-  geom_sf(data = ca, fill = NA, color = "black") +
-  geom_scatterpie(
+ geom_segment(
+  data = comp_wide,
+  aes(x = long, y = lat, xend = long_move, yend = lat_move),
+  color = "black", linewidth = 0.75
+) +
+   geom_scatterpie(
     data = comp_wide,
-    aes(long, lat, r = 1),
+    aes(long_move, lat_move, r = 1),
     cols = c("Acmispon parviflorus"
              ,"Aira caryophyllea"
              ,"Bromus diandrus"
@@ -234,15 +255,25 @@ scale_fill_manual(
     )
     , guide = "none"
   ) +
-  geom_sf(data = ca, fill = NA, color = "black") +
-  coord_sf(xlim = c(-125, -113), ylim = c(32, 42)) +
+  geom_sf(data = ca, fill = NA, color = "black",linewidth = 0.75) +
+  coord_sf(xlim = c(-127, -113), ylim = c(32, 42)) +
   labs(title = "Annual Precipitation in California (WorldClim v2.1)") +
-  theme_minimal()
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank()
+  )  +
+  geom_point(data = data.frame(lat = 38.544854, long = -121.784516), 
+             aes(x = long, y = lat),
+                 color = "red", 
+                 size = 4)
 
 ggsave("CA_precip_comp_map.jpg")
 
-# Remove california border from pie charts
-# Spread out WWP and Sedgwick
+# move the legend into the crook of CA
+
 ```
 
 ## Reproductive allocation & End of Season biomass
