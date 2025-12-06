@@ -60,6 +60,7 @@ library(lmtest)
 library(car)
 library(bbmle)
 library(cropgrowdays)
+library(emmeans)
 ```
 
 ## CA Map and Plant Comp
@@ -95,7 +96,7 @@ ggplot(ppt_df) +
   labs(title = "Annual Precipitation in California (WorldClim v2.1)") +
   theme_minimal()
 
-
+rm(ppt_ca, ppt, ppt_annual)
 ```
 
 
@@ -263,7 +264,8 @@ scale_fill_manual(
     panel.grid = element_blank(),
     axis.text = element_blank(),
     axis.ticks = element_blank(),
-    axis.title = element_blank()
+    axis.title = element_blank(),
+    legend.position = c(0.925,0.725)
   )  +
   geom_point(data = data.frame(lat = 38.544854, long = -121.784516), 
              aes(x = long, y = lat),
@@ -272,13 +274,12 @@ scale_fill_manual(
 
 ggsave("CA_precip_comp_map.jpg")
 
-# move the legend into the crook of CA
-
+rm(comp_sum, comp_reduced)
 ```
 
 ## Reproductive allocation & End of Season biomass
 
-For now, read in what we have so far and create some preliminary figures and analyses.
+Read in data, find outliers, fill in missing data
 
 ```{r}
 #| warning: false
@@ -292,37 +293,40 @@ head(repro)
 
 ### Clean up and create variables
 
-Remove rows that have NA in the Flower Count row and in the Veg Mass Row. For now, also drop rows that don't have any flower masses. Ultimately this should be a function but slow code it for now.
+Remove rows that have NA in the Flower Count row and in the Veg Mass Row. 
 
 ```{r}
-# Figure out how to average flower masses as long as at least Flower_1_g is entered. Come back and do this.
-
+# Remove individuals with no veg mass and no flower count
 repro_narm <- repro %>% 
   drop_na(Flower_Count) %>% 
   drop_na(Veg_Mass)
 
-
+# Read in plot data
 plots <- read_csv("Plot_info copy.csv")
 str(plots)
 summary(plots)
 head(plots)
 
+# Read in species data
 spp <- read_csv("Species Codes copy.csv")
 unique(spp$Sp_Code)
 unique(repro$Species)
 
-# need to pull out first two characters in string of plant ID to create a "plot" column
-
+# Pull plot code from Plant_ID, first two characters
 repro_narm <- repro_narm %>% 
   mutate(Plot = substr(Plant_ID, start = 1, stop = 2))
 unique(repro_narm$Plot)
 
+# merge with plots
 repro_full <- left_join(repro_narm,plots,by = join_by(Plot))
 
+# Change name for consistency
 repro_full$Sp_Code <- repro_full$Species
 
+# merge with species data
 repro_full <- left_join(repro_full,spp,by = join_by(Sp_Code))
 
+# clean up dataset and re-order
 repro_full <- repro_full %>% 
   select(
     Plant_ID,
@@ -355,12 +359,54 @@ repro_full <- repro_full %>%
     Veg_Mass
   )
 
-```
-```{r}
-repro_outliers <- repro_full
 
-# pivot longer flower masses and drop veg mass
-repro_outliers_2 <- repro_outliers %>% 
+# repro_full[which(repro_full$Plant_ID == "G3.AVEFAT.1"),]
+# two separate entries, go back and fix manually. Probably additive
+# Additive! two flower bags and two veg bags.
+
+# repro_full[which(repro_full$Plant_ID == "F2.BRODIA.1"),]
+# was this counted twice?
+# Counted twice, go with the heavier veg mass since debris was probably lost
+
+# repro_full[which(repro_full$Plant_ID == "J1.BRODIA.1"),]
+# was this counted twice?
+# this was counted twice. The 4.01 mass is correct
+
+rm(repro,repro_narm)
+```
+
+Now check for outliers
+```{r}
+# Make a dataset so we can average flower mass per species x population x treatment and then find outliers
+
+repro_outliers_vg <- repro_full %>% 
+  group_by(Sp_Code,
+           Population) %>% 
+  mutate(vg_avg = mean(Veg_Mass, na.rm = TRUE),
+        vg_sd = sd(Veg_Mass, na.rm = TRUE)) %>% 
+  select(Plant_ID,
+         Sp_Code,
+         Population,
+         Veg_Mass,
+         vg_avg,
+         vg_sd)
+
+# remove any rows with NAs
+repro_outliers_vg <- repro_outliers_vg[complete.cases(repro_outliers_vg),]
+
+# get minimums and maximums using 3 standard deviations
+veg_avgs <- repro_outliers_vg %>% 
+  mutate(vg_max = vg_avg + 3*vg_sd,
+         vg_min = vg_avg - 3*vg_sd)
+
+# do the same for veg mass
+vg_outliers <- veg_avgs[which(veg_avgs$Veg_Mass > veg_avgs$vg_max | veg_avgs$Veg_Mass < veg_avgs$vg_min),c("Plant_ID","Sp_Code","Population", "Veg_Mass","vg_avg","vg_sd","vg_min","vg_max")]
+# Only 4 and they are just above the maximum, keep
+
+# write_csv(vg_outliers, "vg_outliers.csv")
+
+# now do separately for fls
+repro_outliers_fl <- repro_full %>% 
   pivot_longer(cols = c(Flower_1_g, 
                         Flower_2_g, 
                         Flower_3_g,
@@ -382,65 +428,198 @@ repro_outliers_2 <- repro_outliers %>%
          Veg_Mass) %>% 
   filter(!is.na(Flower_Mass_g))
 
-write_csv(repro_outliers_2, "repro_intern.csv")
+# export dataset for intern/undergraduate practice
+# write_csv(repro_outliers, "repro_intern.csv")
 
-repro_avgs <- repro_outliers_2 %>% 
+# Group by spp and population and then find averages and standard deviations
+str(repro_outliers_fl)
+
+repro_avgs_fl <- repro_outliers_fl %>% 
   group_by(Sp_Code,
            Population) %>% 
   mutate(fl_avg = mean(Flower_Mass_g, na.rm = TRUE),
-            fl_sd = sd(Flower_Mass_g, na.rm = TRUE),
-            vg_avg = mean(Veg_Mass, na.rm = TRUE),
-            vg_sd = sd(Veg_Mass, na.rm = TRUE)) %>% 
+            fl_sd = sd(Flower_Mass_g, na.rm = TRUE)) %>% 
   select(Plant_ID,
          Sp_Code,
          Population,
          Flower,
          Flower_Mass_g,
          fl_avg,
-         fl_sd,
-         Veg_Mass,
-         vg_avg,
-         vg_sd)
+         fl_sd)
 
-repro_avgs <- repro_avgs[complete.cases(repro_avgs),]
+# remove any rows with NAs
+repro_avgs_fl <- repro_avgs_fl[complete.cases(repro_avgs_fl),]
 
-repro_avgs <- repro_avgs %>% 
+# get minimums and maximums using 3 standard deviations
+repro_avgs_fl <- repro_avgs_fl %>% 
   mutate(fl_max = fl_avg + 3*fl_sd,
-         fl_min = fl_avg - 3*fl_sd,
-         vg_max = vg_avg + 3*vg_sd,
-         vg_min = vg_avg - 3*vg_sd)
+         fl_min = fl_avg - 3*fl_sd)
 
-fl_outliers <- repro_avgs[which(repro_avgs$Flower_Mass_g > repro_avgs$fl_max | repro_avgs$Flower_Mass_g < repro_avgs$fl_min),c("Plant_ID","Sp_Code","Population", "Flower", "Flower_Mass_g","fl_avg","fl_sd","fl_min","fl_max")]
+# Make a dataframe with rows of observations of flower masses that are either larger than the maximum or smaller than the minimum
+fl_outliers <- repro_avgs_fl[which(repro_avgs_fl$Flower_Mass_g > repro_avgs_fl$fl_max | repro_avgs_fl$Flower_Mass_g < repro_avgs_fl$fl_min),c("Plant_ID","Sp_Code","Population", "Flower", "Flower_Mass_g","fl_avg","fl_sd","fl_min","fl_max")]
 
-vg_outliers <- repro_avgs[which(repro_avgs$Veg_Mass > repro_avgs$vg_max | repro_avgs$Veg_Mass < repro_avgs$vg_min),c("Plant_ID","Sp_Code","Population", "Veg_Mass","vg_avg","vg_sd","vg_min","vg_max")]
+# make csvs to look deeper
+# write_csv(fl_outliers, "fl_outliers.csv")
 
-vg_outliers <- vg_outliers[-which(duplicated(vg_outliers)),]
+# find difference between flower mass and maximum
+fl_outliers$dif <- fl_outliers$Flower_Mass_g-fl_outliers$fl_max
 
+# how bad is it? anything bigger than 1 standard deviation difference is too big
+fl_hi <- fl_outliers[which(fl_outliers$dif >= fl_outliers$fl_sd),]
+# flower masses in fl_hi are way too big to include
 
-write_csv(fl_outliers, "fl_outliers.csv")
-write_csv(vg_outliers, "vg_outliers.csv")
+# Make those flower masses NAs and replace in repro_full
+
+# make repro_full long and then rbind and remove duplicates
+fl_hi$Flower_Mass_g <- NA
+fl_hi <- fl_hi %>% 
+  select(
+    Plant_ID,
+    Sp_Code,
+    Population,
+    Flower,
+    Flower_Mass_g) %>% 
+  mutate(
+    ID_no = paste0(Plant_ID,Flower)
+  )
+
+# make original dataset long
+repro_full_long <- repro_full %>% 
+  pivot_longer(cols = c(Flower_1_g, 
+                        Flower_2_g, 
+                        Flower_3_g,
+                        Flower_4_g,
+                        Flower_5_g,
+                        Flower_6_g,
+                        Flower_7_g,
+                        Flower_8_g,
+                        Flower_9_g,
+                        Flower_10_g),
+               names_to = "Flower",
+               values_to = "Flower_Mass_g") %>% 
+  mutate(
+    ID_no = paste0(Plant_ID,Flower)
+  )
+
+# create list of Plant_ID and flower number combos that need to become NA
+nays <- fl_hi$ID_no
+
+# create that dataset of 
+repro_long_filt <- repro_full_long %>% 
+  filter(ID_no %in% c(nays)) %>% 
+  mutate(
+    Flower_Mass_g = NA
+  )
+# 27 outliers converted to NA
+
+# check your work, should return an NA
+repro_long_filt$Flower_Mass_g[repro_long_filt$ID_no == sample(nays,1)]
+
+# Now rbind, order, and remove duplicates
+# 5620 in repro fill long, and 27 in repro long filt
+# should have 5647
+repro_fullfilt_long <- rbind(repro_long_filt,repro_full_long)
+
+repro_long <- repro_fullfilt_long[-which(duplicated(repro_fullfilt_long$ID_no)),]
+
+repro_full_2 <- repro_long %>% 
+  pivot_wider(id_cols = Plant_ID,
+              names_from = Flower,
+              values_from = Flower_Mass_g)
+
+# bind with original
+repro_full <- repro_full %>% 
+  select(
+    Plant_ID,
+    Sp_Code,
+    Scientific_Name,
+    Native_Status,
+    Growth_Habit,
+    Rating,
+    Source,
+    Recorder,
+    Collection_Date,
+    Plot,
+    Block,
+    Shelter,
+    Plot_number,
+    Population,
+    Treatment,
+    Flower_Count,
+    Veg_Mass
+  )
+
+repro_full_3 <- left_join(repro_full_2,repro_full,by=join_by(Plant_ID))
+
+repro_full <- repro_full_3 %>% 
+  select(
+    Plant_ID,
+    Sp_Code,
+    Scientific_Name,
+    Native_Status,
+    Growth_Habit,
+    Rating,
+    Source,
+    Plot,
+    Block, 
+    Shelter,
+    Plot_number,
+    Population,
+    Treatment,
+    Recorder,
+    Collection_Date,
+    Flower_1_g,
+    Flower_2_g,
+    Flower_3_g,
+    Flower_4_g,
+    Flower_5_g,
+    Flower_6_g,
+    Flower_7_g,
+    Flower_8_g,
+    Flower_9_g,
+    Flower_10_g,
+    Flower_Count,
+    Veg_Mass
+  )
+
+rm(repro_outliers_fl,
+   repro_outiers_vg, 
+   repro_avgs_fl,
+   veg_avgs, 
+   fl_outliers, 
+   vg_outliers, 
+   fl_hi, 
+   repro_full_long, 
+   nays, 
+   repro_long_filt, 
+   repro_fullfilt_long, 
+   repro_long,
+   repro_full_2,
+   repro_full_3)
 ```
+
+Now flower outliers have been removed, veg outliers have been checked.
+
+Now fill in average flower mass for for each Species x population x treatment and fill in for individuals with no flower masses. 
 
 ```{r}
 
-# check to make sure you have the right columns
-
+# Average flower masses for each individual
 firstfl = which(colnames(repro_full)=="Flower_1_g")
 lastfl = which(colnames(repro_full)=="Flower_10_g")
-
 repro_full[,c(firstfl:lastfl)]
 
-# Average flower masses for each individual
 repro_full$fl_average <- rowMeans(repro_full[,c(firstfl:lastfl)], na.rm = TRUE)
 
 # Find the individuals with no flower mass
 no_fls <- repro_full[which(repro_full$fl_average == "NaN"),]
-#include everything except fl-Average
 
+# include everything except fl-Average
 firstcol = which(colnames(no_fls)=="Plant_ID")
 lastcol = which(colnames(no_fls)=="Veg_Mass")
 no_fls <- no_fls[,c(firstcol:lastcol)]
 
+# remove the individuals with no flower masses
 repro_full <- repro_full[which(repro_full$fl_average != "NaN"),]
 
 # detach(package:plyr)
@@ -461,53 +640,47 @@ repro_fill$total_fl_mass <- repro_fill$Flower_Count*repro_fill$fl_average
 
 # There's an entry for ESCCAL which hasn't been done yet -- look into
 # Later you can remove any species with only one entry
+
+rm(repro_full,
+   no_fls,
+   avg_fls)
+
 ```
-
-### Find outliers, use ratio of V to R
-
-Go back and detect outliers for flower mass per species 
+Now remove species with low data, less than three observations
 
 ```{r}
 unique(repro_fill$Sp_Code)
 
+# Who are the species with low n?
 summary <- repro_fill %>% 
   group_by(Sp_Code) %>% 
   summarise(n = n()) %>% 
   filter(n < 3)
+# ACMPAR, CAUCOU, ESCCAL, LUPSUC
 
 Sp_List_small <- summary$Sp_Code
-hist(repro_fill$Veg_Mass)
 
 # Remove species with less than 3 entries
 repro_fill_hi_n <- repro_fill[-(which(repro_fill$Sp_Code %in% c(Sp_List_small))),]
 unique(repro_fill_hi_n$Sp_Code)
 
+summary(repro_fill_hi_n)
 
 repro_fill_hi_n_narm <- repro_fill_hi_n[-(which(repro_fill_hi_n$total_fl_mass %in% c(NA, -Inf))),]
 
+rm(summary,
+   Sp_List_small,
+   repro_fill,
+   repro_fill_hi_n)
 ```
+
+We did it! Now graph and analyze.
 
 ### Graph Allometry by Species
 
 Here, make a graph with vegetative biomass on the x-axis and reproductive biomass on the y-axis. Have each species be a different color with raw points on the graph, faded in color. Add a line for each species.
 
-Will need to go back and test and remove outliers
-
-```{r}
-ggplot(repro_fill, aes(x = Veg_Mass, y = total_fl_mass, color = Scientific_Name)) +
-  geom_point(aes(x = Veg_Mass, y = total_fl_mass, color = Scientific_Name)) +
-  geom_smooth(method = "lm", fill = NA) +
-  theme_bw() +
-  labs(x = "Vegetative Biomass",
-       y = "Reproductive Biomass") +
-  theme(axis.text.x = element_text(size=9))
-
-# Consider log -scaling to make more digestible
-
-ggsave("Allom_prelim_plot.jpg")
-```
-
-### Make everything log scale
+Make everything log scale
 
 ```{r}
 repro_fill_hi_n_narm$Veg_Mass_ln <- log(repro_fill_hi_n_narm$Veg_Mass)
@@ -520,7 +693,7 @@ ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = 
 )) +
   geom_abline(intercept = 0, slope = 1) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
-  geom_smooth(method = "lm", fill = NA, size = 1) +
+  geom_smooth(method = "lm", fill = NA, linewidth = 1) +
   # scale_color_viridis(discrete=TRUE) +
   theme_bw() +
   scale_linetype_manual(values = c("Native" = "dashed", "Non-native" = "solid")) +
@@ -538,8 +711,6 @@ ggsave("Allom_log_plot.jpg")
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, data = repro_fill_hi_n_narm))
 
 mod <- lmList(total_fl_mass_ln ~ Veg_Mass_ln | Scientific_Name, data = repro_fill_hi_n_narm)
-
-
 
 # Make plot larger/wider
 mod <- as.data.frame(summary(mod)$coefficients)
@@ -580,33 +751,19 @@ ggplot(repro_slopes, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species
 
 ggsave("Allom_log_plot_slopes.jpg", height=9, width = 9)
 
+# These aren't actually the correct slopes, the correct slopes come from emtrends
 
 
 ```
 
 
+Analysis of lines different than 1:1
+
 ```{r}
-ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name, linetype = Growth_Habit)) +
-  geom_abline(intercept = 0, slope = 1) +
-  #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
-  geom_smooth(method = "lm", fill = NA, size = 0.5) +
-  # scale_color_viridis(discrete=TRUE) +
-  theme_bw() +
-  scale_linetype_manual(values = c("Forb" = "dashed", "Grass" = "solid")) +
-  labs(x = "ln(Vegetative Biomass (g))",
-       y = "ln(Reproductive Biomass (g))") +
-  theme(axis.text.x = element_text(size=9))
-
-# Consider log -scaling to make more digestible
-
-ggsave("Allom_log_plot_Growth.jpg")
-
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, data = repro_fill_hi_n_narm))
 
 mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Scientific_Name, 
           data = repro_fill_hi_n_narm)
-
-library(emmeans)
 
 slopes <- emtrends(mod, ~ Scientific_Name, var = "Veg_Mass_ln")
 slopes
@@ -618,11 +775,12 @@ test_slopes_vs1[which(test_slopes_vs1$p.value<0.05),]
 pairs(slopes)
 # anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Sp_Code, data = repro_fill_hi_n))
 
+options(max.print=2000)
 pairs(slopes, adjust = "tukey")
 
 repro_dif <- repro_slopes %>% 
   filter(
-    Scientific_Name %in% c("Amsinckia menziesii","Avena barbata","Avena fatua","Bromus diandrus","Bromus hordeaceaus"))
+    Scientific_Name %in% c("Amsinckia menziesii","Avena barbata","Bromus diandrus","Bromus hordeaceaus"))
 
 ggplot(repro_dif, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species 
 # , linetype = Native_Status
@@ -643,9 +801,15 @@ ggplot(repro_dif, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species
 
 ggsave("Allom_log_plot_slopes_1.jpg", height=9, width = 15)
 
-
-
 ```
+It's interesting that the three most widespread species are significant and low. And the arguable invasive native is the other significant.
+
+To-do:
+Fix slopes
+Make line graphs prettier
+Make bar graph of slopes and figure out how to make residuals or something into error bars
+Add faded point to the significant graph
+
 
 ### Analysis and Diving Deeper
 
@@ -830,7 +994,7 @@ anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_MADGRA))
 # write_csv(repro_fill, "repro_growth_intern.csv")
 
 ```
-It seems like for forbs they are conservative from southern populations and aggressive from northern and grasses (except BROMAD), they are aggressive from the south and conservative from the north?
+It seems like for forbs they are conservative from southern populations and aggressive from northern and grasses (except BROMAD), they are aggressive from the south and conservative from the north? Forbs less often significant than grasses.
 
 
 - Compare Native v non-native species
@@ -858,8 +1022,6 @@ ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = 
 
 ggsave("Allom_log_plot_Native.jpg")
 
-unique(repro_fill_hi_n$total_fl_mass_ln)
-
 unique(repro_fill_hi_n_narm$total_fl_mass_ln)
 
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Native_Status, data = repro_fill_hi_n_narm))
@@ -883,7 +1045,9 @@ ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = 
 
 ggsave("Allom_log_plot_Pop.jpg")
 
-anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Native_Status, data = repro_fill_hi_n_narm))
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_fill_hi_n_narm))
+
+# Population is significant
 
 lmList(total_fl_mass_ln ~ Veg_Mass_ln | Population, data = repro_fill_hi_n_narm)
 
@@ -911,9 +1075,6 @@ ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = 
        color = "")
 
 ggsave("Allom_log_plot_Native.jpg")
-
-
-
 
 ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Growth_Habit)) +
   # geom_abline(intercept = 0, slope = 1) +
@@ -966,6 +1127,8 @@ They are the same.
 And/or compared native v invasive v non-native.
 
 ```{r}
+repro_fill_hi_n_narm$Rating<- factor(repro_fill_hi_n_narm$Rating, levels = c("Native", "Non-native","Limited","Moderate","High"))
+
 ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Rating)) +
   geom_abline(intercept = 0, slope = 1) +
   geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Rating, alpha = 0.5)) +
@@ -985,7 +1148,7 @@ lmList(total_fl_mass_ln ~ Veg_Mass_ln | Rating, data = repro_fill_hi_n_narm)
 
 ```
 
-There's only two species with classification "High" so might not be a good metric. We could lump all the high and moderates together and limited and non-native together
+There's only two species with classification "High" so might not be a good metric. We could lump all the high and moderates together and limited and non-native together.
 
 Then create a clustered bar graph where each cluster is a population and each bar is native, non-native, and invasive, and the bars indicate the RV slope.
 
@@ -1005,7 +1168,7 @@ str(cf)
 cf[1]
 cf[2]
 
-repro_summary <- repro_fill_hi_n %>% 
+repro_summary <- repro_fill_hi_n_narm %>% 
   group_by(Population,Native_Status) %>% 
   summarise(slope = NA,
             std_err = NA)
@@ -1074,6 +1237,23 @@ ggplot(repro_summary_2, aes(x = factor(Precip_mm, level=c('1780','757','603','38
        fill = "")
 
 ggsave("Slope_Pop_Native.jpg")
+
+# It should align with this graph but it doesn't
+
+
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population, linetype = Native_Status)) +
+  geom_abline(intercept = 0, slope = 1) +
+ # geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
+  geom_smooth(method = "lm", fill = NA) +
+  scale_color_manual(values = c("ANGELO" = "#440154FF", "MCL" = "#3B528BFF", "BORR" = "#21908CFF", "SEDG" = "#5DC863FF", "WWP" = "#FDE725FF")) +
+  theme_bw() +
+    scale_linetype_manual(values = c("Native" = "dashed", "Non-native" = "solid")) +
+  labs(x = "ln(Vegetative Biomass (g))",
+       y = "ln(Reproductive Biomass (g))") +
+  theme(axis.text.x = element_text(size=9))
+
+# These don't line up, doube check slope allocation, probs better to use emmeans
+
 ```
 
 No clear pattern here. Look at tukey comparisons. Would need to see which species are driving these peaks and valleys.
@@ -1101,7 +1281,7 @@ str(cf)
 cf[1]
 cf[2]
 
-repro_summary <- repro_fill_hi_n %>% 
+repro_summary <- repro_fill_hi_n_narm %>% 
   group_by(Population,Growth_Habit) %>% 
   summarise(slope = NA,
             std_err = NA)
@@ -1170,6 +1350,19 @@ ggplot(repro_summary_2, aes(x = factor(Precip_mm, level=c('1780','757','603','38
        fill = "")
 
 ggsave("Slope_Pop_Growth.jpg")
+
+ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population, linetype = Growth_Habit)) +
+  geom_abline(intercept = 0, slope = 1) +
+ # geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Population)) +
+  geom_smooth(method = "lm", fill = NA) +
+  scale_color_manual(values = c("ANGELO" = "#440154FF", "MCL" = "#3B528BFF", "BORR" = "#21908CFF", "SEDG" = "#5DC863FF", "WWP" = "#FDE725FF")) +
+  theme_bw() +
+    scale_linetype_manual(values = c("Forb" = "dashed", "Grass" = "solid")) +
+  labs(x = "ln(Vegetative Biomass (g))",
+       y = "ln(Reproductive Biomass (g))") +
+  theme(axis.text.x = element_text(size=9))
+
+# These don't line up, double check slope allocation, probs better to use emmeans
 
 ```
 Also no clear pattern. "It seems like for forbs they are conservative from southern populations and aggressive from northern and grasses (except BROMAD), they are aggressive from the south and conservative from the north?" -- this pattern only play out among species in multiple populations, and it's relative to where they are. How might I capture that?
