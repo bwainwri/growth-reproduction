@@ -671,10 +671,19 @@ summary(repro_fill_hi_n)
 
 repro_fill_hi_n_narm <- repro_fill_hi_n[-(which(repro_fill_hi_n$total_fl_mass %in% c(NA, -Inf))),]
 
+repro_fill_hi_n_narm_1 <- repro_fill_hi_n_narm
+
+# Lastly add in precipitation
+precip <- read_csv("Site_Precip.csv")
+repro_fill_hi_n_narm <- left_join(repro_fill_hi_n_narm_1,precip, by=join_by("Population"))
+
 rm(summary,
    Sp_List_small,
    repro_fill,
-   repro_fill_hi_n)
+   repro_fill_hi_n,
+   precip,
+   repro_fill_hi_n_narm_1
+   )
 ```
 
 We did it! Now graph and analyze.
@@ -739,7 +748,7 @@ ggplot(repro_slopes, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species
 )) +
   geom_abline(intercept = 0, slope = 1) +
   #geom_point(aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Species)) +
-  geom_smooth(method = "lm", fill = NA, size = 0.5) +
+  geom_smooth(method = "lm", fill = NA, linewidth = 0.5) +
   # scale_color_viridis(discrete=TRUE) +
   theme_bw() +
   scale_linetype_manual(values = c("Native" = "dashed", "Non-native" = "solid")) +
@@ -871,7 +880,361 @@ ggsave("slopes_spp.jpg")
 
 ```
 
+Bar graph of native status
 
+
+```{r}
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Native_Status, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Native_Status, 
+          data = repro_fill_hi_n_narm)
+
+
+slopes <- emtrends(mod, ~ Native_Status, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes) %>% 
+  arrange(desc(Veg_Mass_ln.trend))
+
+ggplot(slopes.df, aes(x = Native_Status, y = Veg_Mass_ln.trend
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity", fill = "#21908CFF") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  labs(x = "Native Status",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_native.jpg")
+
+```
+
+bar graph of degree of invasiveness
+
+```{r}
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Rating, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Rating, 
+          data = repro_fill_hi_n_narm)
+
+
+slopes <- emtrends(mod, ~ Rating, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Rating, y = Veg_Mass_ln.trend
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity", fill = "#21908CFF") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  labs(x = "Native Status",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_rating.jpg")
+
+```
+
+
+bar graph of growth habit
+
+```{r}
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Growth_Habit, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Growth_Habit, 
+          data = repro_fill_hi_n_narm)
+
+
+slopes <- emtrends(mod, ~ Growth_Habit, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Growth_Habit, y = Veg_Mass_ln.trend
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity", fill = "#21908CFF") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  labs(x = "Growth Habit",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_growth.jpg")
+
+```
+
+Now make a bar graph of growth habit and native status 
+
+```{r}
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Growth_Habit*Native_Status, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Growth_Habit * Native_Status, 
+          data = repro_fill_hi_n_narm)
+
+
+slopes <- emtrends(mod, ~ Growth_Habit*Native_Status, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Growth_Habit, y = Veg_Mass_ln.trend,
+                      fill = Native_Status
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  scale_fill_manual(values = c("Native" = "#440154FF", "Non-native" = "#21908CFF")) +
+  labs(x = "Growth Habit",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_growthxnative.jpg")
+
+```
+
+Now make a bar graph of growth habit and native rating
+
+```{r}
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Growth_Habit*Rating, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Growth_Habit * Rating, 
+          data = repro_fill_hi_n_narm)
+
+
+slopes <- emtrends(mod, ~ Growth_Habit*Rating, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Growth_Habit, y = Veg_Mass_ln.trend,
+                      fill = Rating
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  scale_fill_manual(values = c("Native" = "#440154FF", "Non-native" = "#3B528BFF", "Limited" = "#21908CFF", "Moderate" = "#5DC863FF", "High" = "#FDE725FF")) +
+  labs(x = "Growth Habit",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_growthxrating.jpg")
+
+```
+
+Bar graph of populations
+```{r}
+
+repro_fill_hi_n_narm$Population <- factor(repro_fill_hi_n_narm$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
+
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Population, 
+          data = repro_fill_hi_n_narm)
+
+
+slopes <- emtrends(mod, ~ Population, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Population, y = Veg_Mass_ln.trend,
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour='black', alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  scale_fill_manual(values = c("ANGELO" = "#440154FF", "MCL" = "#3B528BFF", "BORR" = "#21908CFF", "SEDG" = "#5DC863FF", "WWP" = "#FDE725FF")) +
+  labs(x = "Population",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_population.jpg")
+
+```
+
+
+Bar graph of population by native status
+
+```{r}
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Native_Status, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Population * Native_Status, 
+          data = repro_fill_hi_n_narm)
+
+
+slopes <- emtrends(mod, ~ Population*Native_Status, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Population, y = Veg_Mass_ln.trend,
+                      fill = Native_Status
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  scale_fill_manual(values = c("Native" = "#440154FF", "Non-native" = "#21908CFF")) +
+  labs(x = "Population",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_popxnative.jpg")
+
+```
+
+
+Bar graph of population by rating
+
+```{r}
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Rating, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Rating, 
+          data = repro_fill_hi_n_narm)
+
+
+slopes <- emtrends(mod, ~ Population*Rating, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Population, y = Veg_Mass_ln.trend,
+                      fill = Rating
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  scale_fill_manual(values = c("Native" = "#440154FF", "Non-native" = "#3B528BFF", "Limited" = "#21908CFF", "Moderate" = "#5DC863FF", "High" = "#FDE725FF")) +
+  labs(x = "Population",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_popxrating.jpg")
+
+```
+
+
+bar graph of population by growth habit
+
+```{r}
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Growth_Habit, data = repro_fill_hi_n_narm))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Population * Growth_Habit, 
+          data = repro_fill_hi_n_narm)
+
+
+slopes <- emtrends(mod, ~ Population*Growth_Habit, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Population, y = Veg_Mass_ln.trend,
+                      fill = Growth_Habit
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  scale_fill_manual(values = c("Forb" = "#440154FF", "Grass" = "#21908CFF")) +
+  labs(x = "Population",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_popxgrowth.jpg")
+
+```
+
+bar graph with only species found in multiple populations, clustered by species
+
+
+
+
+Model looking at what creates the ratio of log r and log v. Use species as random effect, and use that to determine best graph
+
+```{r}
+str(repro_fill_hi_n_narm)
+
+# Create ratio of fl to v
+repro_fill_hi_n_narm$VR <- repro_fill_hi_n_narm$total_fl_mass_ln/repro_fill_hi_n_narm$Veg_Mass_ln
+
+m0 <- glm(VR ~ 1, family = gaussian, data = repro_fill_hi_n_narm)
+
+m1 <- glmer(VR ~ 1 + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m2 <- glmer(VR ~ 1 + (1|Block/Shelter/Plot), family = gaussian, data = repro_fill_hi_n_narm)
+
+m3 <- glmer(VR ~ 1 + (1|Block) + (1|Treatment), family = gaussian, data = repro_fill_hi_n_narm)
+
+m4 <- glmer(VR ~ 1 + (1|Block/Shelter/Plot) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m5 <- glmer(VR ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m6 <- glmer(VR ~ 1 + (1|Block) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+ICtab(m0,m1,m2,m3,m4,m5,m6)
+
+m5 <- glmer(VR ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_native <- glmer(VR ~ Native_Status + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_rating <- glmer(VR ~ Rating + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_growth <- glmer(VR ~ Growth_Habit + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_precip <- glmer(VR ~ Precip_mm + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_pdif <- glmer(VR ~ precip_dif + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_nativexgrowth <- glmer(VR ~ Native_Status*Growth_Habit + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_ratingxgrowth <- glmer(VR ~ Rating*Growth_Habit + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_nativexpop <- glmer(VR ~ Native_Status*Population + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_ratingxpop <- glmer(VR ~ Rating*Population + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_growthxpop <- glmer(VR ~ Growth_Habit*Population + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_nativexprecip <- glmer(VR ~ Native_Status*Precip_mm + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_ratingxprecip <- glmer(VR ~ Rating*Precip_mm + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_growthxprecip <- glmer(VR ~ Growth_Habit*Precip_mm + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+
+ICtab(m5
+      ,m_native
+      ,m_rating
+      ,m_growth
+      ,m_growthxpop
+      ,m_growthxprecip
+      ,m_nativexgrowth
+      ,m_nativexpop
+      ,m_nativexprecip
+      ,m_pdif
+      ,m_precip
+      ,m_ratingxgrowth
+      ,m_ratingxpop
+      ,m_ratingxprecip)
+lrtest(m_ratingxpop, m5)
+Anova(m_ratingxpop)
+summary(m_ratingxpop)
+#mall
+
+# Check for overdispersion
+# deviance/residual df
+
+
+### Come back to this
+
+```
 
 ### Analysis and Diving Deeper
 
