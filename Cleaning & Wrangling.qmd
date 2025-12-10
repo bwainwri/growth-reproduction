@@ -29,6 +29,13 @@ These data come from a common garden drought experiment in Davis, California inv
 
 Bring in, explore, clean, rectify outliers, organize each trait or group of traits and export as "...\_CLEAN"
 
+## To-do list
+- Check for effects of drought treatment
+- Add in aridity index
+- Check assumptions for models
+- Fix Map orientation
+- Add 3-part rating (native, non-native, invasive)
+
 ## Setup
 
 ```{r}
@@ -686,19 +693,82 @@ rm(summary,
    )
 ```
 
+Find and add in SPEI
+
+```{r}
+#| eval: false
+install.packages("devtools")
+require(devtools)
+devtools::install_github('seschaub/getSpei')
+require(getSpei)
+
+workdir <- getwd()
+setwd(workdir)
+
+# create data frame:
+Population  <- c("ANGELO", "MCL", "BORR","SEDG","WWP")
+longitude    <- c(-123.6302, -121.72841, -122.42114, -120.0545, -119.16882)
+latitude     <- c(39.75141, 37.37914, 38.87508, 34.70243, 34.91771)
+locations_df <- data.frame(Population, longitude, latitude)
+
+# specify arguments and run function:
+d1 <- spec_spei(spei_files = "spei48", start_y = 2015, end_y = 2015, 
+                locations = locations_df)
+
+write.csv(d1, "SPEI_Pop.csv")
+```
+
+```{r}
+spei <- read_csv("SPEI_Pop.csv")
+spei <- spei %>% 
+  filter(month > 2 & month < 6)
+
+
+spei_avg <- spei %>% 
+  group_by(location_id) %>% 
+  summarise(spei_avg = mean(spei48)) %>% 
+  mutate(Population = location_id)
+
+spei_avg <- spei_avg[,c("Population","spei_avg")]
+
+repro_fill_hi_n_narm_1 <- left_join(repro_fill_hi_n_narm,spei_avg, by=join_by("Population"))
+
+repro_fill_hi_n_narm <- repro_fill_hi_n_narm_1
+
+repro_fill_hi_n_narm$Veg_Mass_ln <- log(repro_fill_hi_n_narm$Veg_Mass)
+repro_fill_hi_n_narm$total_fl_mass_ln <- log(repro_fill_hi_n_narm$total_fl_mass)
+
+repro_fill_hi_n_narm <- repro_fill_hi_n_narm[-(which(repro_fill_hi_n_narm$total_fl_mass_ln %in% c(NA, -Inf))),]
+
+# Create ratio of fl to v
+repro_fill_hi_n_narm$VR <- repro_fill_hi_n_narm$total_fl_mass_ln/repro_fill_hi_n_narm$Veg_Mass_ln
+
+repro_fill_hi_n_narm <- repro_fill_hi_n_narm %>% 
+  mutate(rating.n = (
+    case_when(
+      Rating == "Native" ~ 1
+      , Rating == "Non-native" ~ 2
+      , Rating == "Limited" ~ 3
+      , Rating == "Moderate" ~ 4
+      , Rating == "High" ~ 5
+    )
+  ))
+
+```
+
+
+
 We did it! Now graph and analyze.
 
-### Graph Allometry by Species
+### Graph & Analyze
 
 Here, make a graph with vegetative biomass on the x-axis and reproductive biomass on the y-axis. Have each species be a different color with raw points on the graph, faded in color. Add a line for each species.
 
 Make everything log scale
 
+#### Line: Species slopes
 ```{r}
-repro_fill_hi_n_narm$Veg_Mass_ln <- log(repro_fill_hi_n_narm$Veg_Mass)
-repro_fill_hi_n_narm$total_fl_mass_ln <- log(repro_fill_hi_n_narm$total_fl_mass)
 
-repro_fill_hi_n_narm <- repro_fill_hi_n_narm[-(which(repro_fill_hi_n_narm$total_fl_mass_ln %in% c(NA, -Inf))),]
 
 ggplot(repro_fill_hi_n_narm, aes(x = Veg_Mass_ln, y = total_fl_mass_ln, color = Scientific_Name 
 # , linetype = Native_Status
@@ -772,6 +842,7 @@ ggsave("Allom_log_plot_slopes.jpg", height=9, width = 9)
 Analysis of lines different than 1:1
 
 ```{r}
+#| eval: false
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, data = repro_fill_hi_n_narm))
 
 mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Scientific_Name, 
@@ -816,11 +887,7 @@ ggsave("Allom_log_plot_slopes_1.jpg", height=9, width = 15)
 ```
 It's interesting that the three most widespread species are significant and low. And the arguable invasive native is the other significant.
 
-To-do:
-Fix slopes
-Make line graphs prettier
-Make bar graph of slopes and figure out how to make residuals or something into error bars
-Add faded point to the significant graph
+#### Bar: Species slopes
 
 ```{r}
 slopes <- emtrends(mod, ~ Scientific_Name, var = "Veg_Mass_ln")
@@ -880,8 +947,7 @@ ggsave("slopes_spp.jpg")
 
 ```
 
-Bar graph of native status
-
+#### Bar: Native
 
 ```{r}
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Native_Status, data = repro_fill_hi_n_narm))
@@ -910,7 +976,7 @@ ggsave("slopes_native.jpg")
 
 ```
 
-bar graph of degree of invasiveness
+#### Bar: Rating
 
 ```{r}
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Rating, data = repro_fill_hi_n_narm))
@@ -938,8 +1004,7 @@ ggsave("slopes_rating.jpg")
 
 ```
 
-
-bar graph of growth habit
+#### Bar: Growth
 
 ```{r}
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Growth_Habit, data = repro_fill_hi_n_narm))
@@ -967,7 +1032,7 @@ ggsave("slopes_growth.jpg")
 
 ```
 
-Now make a bar graph of growth habit and native status 
+#### Bar: GrowthxNative 
 
 ```{r}
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Growth_Habit*Native_Status, data = repro_fill_hi_n_narm))
@@ -997,7 +1062,7 @@ ggsave("slopes_growthxnative.jpg")
 
 ```
 
-Now make a bar graph of growth habit and native rating
+#### Bar: GrowthxRating
 
 ```{r}
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Growth_Habit*Rating, data = repro_fill_hi_n_narm))
@@ -1027,7 +1092,8 @@ ggsave("slopes_growthxrating.jpg")
 
 ```
 
-Bar graph of populations
+#### Bar: Population
+
 ```{r}
 
 repro_fill_hi_n_narm$Population <- factor(repro_fill_hi_n_narm$Population, levels = c("ANGELO", "MCL", "BORR","SEDG","WWP"))
@@ -1058,8 +1124,7 @@ ggsave("slopes_population.jpg")
 
 ```
 
-
-Bar graph of population by native status
+#### Bar: PopxNative
 
 ```{r}
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Native_Status, data = repro_fill_hi_n_narm))
@@ -1089,8 +1154,7 @@ ggsave("slopes_popxnative.jpg")
 
 ```
 
-
-Bar graph of population by rating
+#### Bar: PopxRating
 
 ```{r}
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Rating, data = repro_fill_hi_n_narm))
@@ -1120,8 +1184,7 @@ ggsave("slopes_popxrating.jpg")
 
 ```
 
-
-bar graph of population by growth habit
+#### Bar: PopxGrowth
 
 ```{r}
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Growth_Habit, data = repro_fill_hi_n_narm))
@@ -1151,11 +1214,7 @@ ggsave("slopes_popxgrowth.jpg")
 
 ```
 
-bar graph with only species found in multiple populations, clustered by species
-
-
-
-
+#### Model: VR
 Model looking at what creates the ratio of log r and log v. Use species as random effect, and use that to determine best graph
 
 ```{r}
@@ -1163,6 +1222,17 @@ str(repro_fill_hi_n_narm)
 
 # Create ratio of fl to v
 repro_fill_hi_n_narm$VR <- repro_fill_hi_n_narm$total_fl_mass_ln/repro_fill_hi_n_narm$Veg_Mass_ln
+
+repro_fill_hi_n_narm <- repro_fill_hi_n_narm %>% 
+  mutate(rating.n = (
+    case_when(
+      Rating == "Native" ~ 1
+      , Rating == "Non-native" ~ 2
+      , Rating == "Limited" ~ 3
+      , Rating == "Moderate" ~ 4
+      , Rating == "High" ~ 5
+    )
+  ))
 
 m0 <- glm(VR ~ 1, family = gaussian, data = repro_fill_hi_n_narm)
 
@@ -1192,6 +1262,8 @@ m_precip <- glmer(VR ~ Precip_mm + (1|Block) + (1|Treatment) + (1|Scientific_Nam
 
 m_pdif <- glmer(VR ~ precip_dif + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
 
+m_rating.n <- glmer(VR ~ rating.n + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
 m_nativexgrowth <- glmer(VR ~ Native_Status*Growth_Habit + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
 
 m_ratingxgrowth <- glmer(VR ~ Rating*Growth_Habit + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
@@ -1208,6 +1280,12 @@ m_ratingxprecip <- glmer(VR ~ Rating*Precip_mm + (1|Block) + (1|Treatment) + (1|
 
 m_growthxprecip <- glmer(VR ~ Growth_Habit*Precip_mm + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
 
+m_rating.nxpop <- glmer(VR ~ rating.n*Population + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_rating.nxgrowth <- glmer(VR ~ rating.n*Growth_Habit + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_rating.nxprecip <- glmer(VR ~ rating.n*Precip_mm + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
 
 ICtab(m5
       ,m_native
@@ -1222,7 +1300,11 @@ ICtab(m5
       ,m_precip
       ,m_ratingxgrowth
       ,m_ratingxpop
-      ,m_ratingxprecip)
+      ,m_ratingxprecip
+      ,m_rating.n
+      ,m_rating.nxgrowth
+      ,m_rating.nxpop
+      ,m_rating.nxprecip)
 lrtest(m_ratingxpop, m5)
 Anova(m_ratingxpop)
 summary(m_ratingxpop)
@@ -1235,6 +1317,324 @@ summary(m_ratingxpop)
 ### Come back to this
 
 ```
+
+#### Model: Fl Mass
+
+```{r}
+str(repro_fill_hi_n_narm)
+
+# Create ratio of fl to v
+repro_fill_hi_n_narm$VR <- repro_fill_hi_n_narm$total_fl_mass_ln/repro_fill_hi_n_narm$Veg_Mass_ln
+
+repro_fill_hi_n_narm <- repro_fill_hi_n_narm %>% 
+  mutate(rating.n = (
+    case_when(
+      Rating == "Native" ~ 1
+      , Rating == "Non-native" ~ 2
+      , Rating == "Limited" ~ 3
+      , Rating == "Moderate" ~ 4
+      , Rating == "High" ~ 5
+    )
+  ))
+
+m0 <- glm(total_fl_mass_ln ~ 1, family = gaussian, data = repro_fill_hi_n_narm)
+
+m1 <- glmer(total_fl_mass_ln ~ 1 + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m2 <- glmer(total_fl_mass_ln ~ 1 + (1|Block/Shelter/Plot), family = gaussian, data = repro_fill_hi_n_narm)
+
+m3 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment), family = gaussian, data = repro_fill_hi_n_narm)
+
+m4 <- glmer(total_fl_mass_ln ~ 1 + (1|Block/Shelter/Plot) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m5 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m6 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+ICtab(m0,m1,m2,m3,m4,m5,m6)
+
+m5 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+mV <- glmer(total_fl_mass_ln ~ Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_native <- glmer(total_fl_mass_ln ~ Native_Status*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_rating <- glmer(total_fl_mass_ln ~ Rating*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_growth <- glmer(total_fl_mass_ln ~ Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_precip <- glmer(total_fl_mass_ln ~ Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_pdif <- glmer(total_fl_mass_ln ~ precip_dif*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_rating.n <- glmer(total_fl_mass_ln ~ rating.n*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_nativexgrowth <- glmer(total_fl_mass_ln ~ Native_Status*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_ratingxgrowth <- glmer(total_fl_mass_ln ~ Rating*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_nativexpop <- glmer(total_fl_mass_ln ~ Native_Status*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_ratingxpop <- glmer(total_fl_mass_ln ~ Rating*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_growthxpop <- glmer(total_fl_mass_ln ~ Growth_Habit*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_nativexprecip <- glmer(total_fl_mass_ln ~ Native_Status*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_ratingxprecip <- glmer(total_fl_mass_ln ~ Rating*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_growthxprecip <- glmer(total_fl_mass_ln ~ Growth_Habit*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_rating.nxpop <- glmer(total_fl_mass_ln ~ rating.n*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_rating.nxgrowth <- glmer(total_fl_mass_ln ~ rating.n*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+m_rating.nxprecip <- glmer(total_fl_mass_ln ~ rating.n*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+
+
+ICtab(m5
+      ,mV
+      ,m_native
+      ,m_rating
+      ,m_growth
+      ,m_growthxpop
+      ,m_growthxprecip
+      ,m_nativexgrowth
+      ,m_nativexpop
+      ,m_nativexprecip
+      ,m_pdif
+      ,m_precip
+      ,m_ratingxgrowth
+      ,m_ratingxpop
+      ,m_ratingxprecip
+      ,m_rating.n
+      ,m_rating.nxgrowth
+      ,m_rating.nxpop
+      ,m_rating.nxprecip)
+lrtest(m_growth, m5)
+Anova(m_growth)
+summary(m_growth)
+#mall
+
+# Check assumptions
+
+```
+
+
+I think it's best to keep it limited to growth habit and native status in terms of anova/a model. 
+
+Then, for question three, limit it to species found at multiple locations. 
+
+```{r}
+# How to filter for species found in multiple populations
+
+unique(repro_fill_hi_n_narm[which(repro_fill_hi_n_narm$Scientific_Name == "Avena barbata"),"Population"])
+  
+repro_fill_hi_n_narm %>% 
+  group_by(Scientific_Name) %>% 
+  count(Population)
+
+repro_temp <- unique(repro_fill_hi_n_narm[,c("Scientific_Name","Population")])
+
+repro_temp_2 <- repro_temp %>% 
+  group_by(Scientific_Name) %>% 
+  count() %>% 
+  filter(n > 1)
+
+mults <- repro_temp_2$Scientific_Name
+
+repro_pop <- repro_fill_hi_n_narm %>% 
+  filter(Scientific_Name %in% c(mults))
+
+rm(
+  repro_temp
+  , repro_temp_2
+  , mults
+)
+```
+
+#### Bar: PopxSpecies
+
+```{r}
+
+# Graph, model, and analyze
+anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Scientific_Name, data = repro_pop))
+
+mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln*Population*Scientific_Name, 
+          data = repro_pop)
+
+slopes <- emtrends(mod, ~ Population*Scientific_Name, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Scientific_Name, y = Veg_Mass_ln.trend,
+                      fill = Population
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour='black', alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(face = "italic", angle = 45, vjust = 1, hjust = 1)) +
+  scale_fill_manual(values = c("ANGELO" = "#440154FF", "MCL" = "#3B528BFF", "BORR" = "#21908CFF", "SEDG" = "#5DC863FF", "WWP" = "#FDE725FF")) +
+  labs(x = "Species",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_popxspp.jpg")
+
+# Add in aridity index
+# Make Grass and Forb panel
+
+```
+
+#### Model: Pop
+
+```{r}
+str(repro_pop)
+
+m0 <- glm(total_fl_mass_ln ~ 1, family = gaussian, data = repro_pop)
+
+m1 <- glmer(total_fl_mass_ln ~ 1 + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m2 <- glmer(total_fl_mass_ln ~ 1 + (1|Block/Shelter/Plot), family = gaussian, data = repro_pop)
+
+m3 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment), family = gaussian, data = repro_pop)
+
+m4 <- glmer(total_fl_mass_ln ~ 1 + (1|Block/Shelter/Plot) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m5 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m6 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+ICtab(m0,m1,m2,m3,m4,m5,m6)
+
+m5 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+mV <- glmer(total_fl_mass_ln ~ Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_native <- glmer(total_fl_mass_ln ~ Native_Status*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_rating <- glmer(total_fl_mass_ln ~ Rating*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_growth <- glmer(total_fl_mass_ln ~ Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_precip <- glmer(total_fl_mass_ln ~ Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_pdif <- glmer(total_fl_mass_ln ~ precip_dif*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_rating.n <- glmer(total_fl_mass_ln ~ rating.n*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_nativexgrowth <- glmer(total_fl_mass_ln ~ Native_Status*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_ratingxgrowth <- glmer(total_fl_mass_ln ~ Rating*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_nativexpop <- glmer(total_fl_mass_ln ~ Native_Status*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_ratingxpop <- glmer(total_fl_mass_ln ~ Rating*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_growthxpop <- glmer(total_fl_mass_ln ~ Growth_Habit*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_nativexprecip <- glmer(total_fl_mass_ln ~ Native_Status*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_ratingxprecip <- glmer(total_fl_mass_ln ~ Rating*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_growthxprecip <- glmer(total_fl_mass_ln ~ Growth_Habit*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_rating.nxpop <- glmer(total_fl_mass_ln ~ rating.n*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_rating.nxgrowth <- glmer(total_fl_mass_ln ~ rating.n*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_rating.nxprecip <- glmer(total_fl_mass_ln ~ rating.n*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_spei <- glmer(total_fl_mass_ln ~ spei_avg*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_speixgrowth <- glmer(total_fl_mass_ln ~ spei_avg*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_speixnative <- glmer(total_fl_mass_ln ~ spei_avg*Native_Status*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_spei_p <- glmer(total_fl_mass_ln ~ spei_avg+Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_spei_p_xnative <- glmer(total_fl_mass_ln ~ spei_avg+Veg_Mass_ln*Native_Status + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+m_spei_p_xgrowth <- glmer(total_fl_mass_ln ~ spei_avg+Veg_Mass_ln*Growth_Habit + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+ICtab(m5
+      ,mV
+      ,m_native
+      ,m_rating
+      ,m_growth
+      ,m_growthxpop
+      ,m_growthxprecip
+      ,m_nativexgrowth
+      ,m_nativexpop
+      ,m_nativexprecip
+      ,m_pdif
+      ,m_precip
+      ,m_ratingxgrowth
+      ,m_ratingxpop
+      ,m_ratingxprecip
+      ,m_rating.n
+      ,m_rating.nxgrowth
+      ,m_rating.nxpop
+      ,m_rating.nxprecip
+      ,m_spei
+      ,m_speixgrowth
+      ,m_speixnative
+      ,m_spei_p
+      ,m_spei_p_xnative
+      ,m_spei_p_xgrowth)
+
+# m_spei_p_xnative, m_spei_p_xgrowth are the best. The growth/native term is effectively the same because all the grasses are non native and most of the forbs are native
+
+lrtest(m_growth, m5)
+Anova(m_speixnative)
+summary(m_speixgrowth)
+VarCorr(m_spei_p_xgrowth)
+
+
+# Check assumptions
+
+```
+```{r}
+# install.packages("ggeffects")
+library(ggeffects)
+library(ggplot2)
+
+pred_int <- ggpredict(m_spei_p_xgrowth, terms = c("Veg_Mass_ln", "Growth_Habit"))
+
+ggplot(pred_int, aes(x = x, y = predicted, color = group)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group),
+              alpha = 0.2, color = NA) +
+  theme_bw() +
+  labs(x = "Vegetative Biomass (log)", 
+       y = "Predicted Flower Mass (log)",
+       color = "Growth Habit",
+       fill = "Growth Habit")
+
+pred_spei <- ggpredict(m_spei_p_xgrowth, terms = "spei_avg")
+
+ggplot(pred_spei, aes(x, predicted)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2) +
+  theme_bw() +
+  labs(x = "SPEI (avg)", 
+       y = "Predicted Flower Mass (log)")
+
+# install.packages("sjPlot")
+library(sjPlot)
+plot_model(m_spei_p_xgrowth, type = "pred", terms = c("Veg_Mass_ln", "Growth_Habit"))
+
+
+plot(m_spei_p_xgrowth)        # residual diagnostics
+qqnorm(resid(m_spei_p_xgrowth))
+qqline(resid(m_spei_p_xgrowth))
+
+log(0.1)
+```
+
 
 ### Analysis and Diving Deeper
 
