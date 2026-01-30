@@ -35,6 +35,10 @@ Bring in, explore, clean, rectify outliers, organize each trait or group of trai
 - Check assumptions for models
 - Fix Map orientation
 - Add 3-part rating (native, non-native, invasive)
+- Licor outliers and mismatches
+- Include seed mass in PCA
+- Figure out if PCA is predicting something
+- check for outliers in not RGR and non reproductive stuff
 
 ## Setup
 
@@ -284,9 +288,6 @@ ggsave("CA_precip_comp_map.jpg")
 rm(comp_sum, comp_reduced)
 ```
 
-Alignment is off -- need to fix
-
-
 ## Reproductive allocation & End of Season biomass
 
 Read in data, find outliers, fill in missing data
@@ -344,8 +345,10 @@ repro_full <- repro_full %>%
     Scientific_Name,
     Native_Status,
     Growth_Habit,
+    Growth_2,
     Perenniality,
     Rating,
+    Rating_2,
     Source,
     Recorder,
     Collection_Date,
@@ -545,7 +548,9 @@ repro_full <- repro_full %>%
     Scientific_Name,
     Native_Status,
     Growth_Habit,
+    Growth_2,
     Rating,
+    Rating_2,
     Source,
     Recorder,
     Collection_Date,
@@ -568,7 +573,9 @@ repro_full <- repro_full_3 %>%
     Scientific_Name,
     Native_Status,
     Growth_Habit,
+    Growth_2,
     Rating,
+    Rating_2,
     Source,
     Plot,
     Block, 
@@ -756,8 +763,6 @@ repro_fill_hi_n_narm <- repro_fill_hi_n_narm %>%
 
 ```
 
-
-
 We did it! Now graph and analyze.
 
 ### Graph & Analyze
@@ -842,16 +847,16 @@ ggsave("Allom_log_plot_slopes.jpg", height=9, width = 9)
 Analysis of lines different than 1:1
 
 ```{r}
-#| eval: false
+
 anova(lm(total_fl_mass_ln ~ Veg_Mass_ln*Scientific_Name, data = repro_fill_hi_n_narm))
 
 mod <- lm(total_fl_mass_ln ~ Veg_Mass_ln * Scientific_Name, 
           data = repro_fill_hi_n_narm)
 
 slopes <- emtrends(mod, ~ Scientific_Name, var = "Veg_Mass_ln")
-slopes
+slopes.df <- as.data.frame(slopes)
 
-test_slopes_vs1 <- test(slopes, null = 1)
+test_slopes_vs1 <- summary(slopes, infer = TRUE, null = 1)
 test_slopes_vs1[which(test_slopes_vs1$p.value<0.05),]
 
 
@@ -896,7 +901,7 @@ slopes
 slopes.df <- summary(slopes) %>% 
   arrange(desc(Veg_Mass_ln.trend))
 
-test_slopes_vs1 <- test(slopes, null = 1)
+test_slopes_vs1 <- summary(slopes, infer = TRUE, null = 1)
 test_slopes_vs1[which(test_slopes_vs1$p.value<0.05),]
 
 level_order <- unique(as.factor(slopes.df$Scientific_Name))
@@ -944,6 +949,32 @@ ggplot(slopes.df, aes(x = factor(Scientific_Name, level=c(level_order)), y = Veg
 
 ggsave("slopes_spp.jpg")
 
+
+ggplot(slopes.df, aes(x = factor(Scientific_Name, level=c(level_order)), y = Veg_Mass_ln.trend
+                       , fill = columnColor
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity") +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  scale_fill_manual(values = c("N.S." = "#21908CFF", "p-value < 0.05" = "#440154FF")) +
+  theme(
+    axis.text.x = element_blank(),
+    legend.text =element_text(size=12, colour="black"),
+    axis.text.y=element_text(size=12, colour="black"),
+    axis.title=element_text(size=12,face="bold"),
+    legend.position = c(0.75, 0.95),
+    #legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    plot.margin = unit(c(0.25,0.25,0.25,0.75), "cm")
+  ) + 
+  guides(fill=guide_legend(ncol=2)) +
+  labs(x = "Species",
+       y = "RV Slope",
+       fill = "")
+
+ggsave("slopes_spp_prez.jpg", width = 7,height = 3.5)
 
 ```
 
@@ -1046,19 +1077,26 @@ slopes
 
 slopes.df <- summary(slopes)
 
-ggplot(slopes.df, aes(x = Growth_Habit, y = Veg_Mass_ln.trend,
-                      fill = Native_Status
+ggplot(slopes.df, aes(x = Native_Status, y = Veg_Mass_ln.trend,
+                      fill = Growth_Habit
                       )) + 
   geom_bar(position = position_dodge(), stat = "identity") +
-  geom_hline(yintercept = 1, linetype = "dashed") +
+ # geom_hline(yintercept = 1, linetype = "dashed") +
   geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
   theme_classic() +
-  scale_fill_manual(values = c("Native" = "#440154FF", "Non-native" = "#21908CFF")) +
-  labs(x = "Growth Habit",
-       y = "VR Slope",
-       fill = "")
+  scale_fill_manual(values = c("Forb" = "#440154FF", "Grass" = "#21908CFF")) +
+  theme(
+    legend.title = element_text(size=12,face="bold"),
+    legend.text =element_text(size=12, colour="black"),
+    axis.text=element_text(size=12, colour="black"),
+    axis.title=element_text(size=12,face="bold"),
+    plot.margin = unit(c(0.25,0.25,0.25,0.75), "cm")
+  ) +
+  labs(x = "Native Status",
+       y = "RV Slope",
+       fill = "Growth Habit")
 
-ggsave("slopes_growthxnative.jpg")
+ggsave("slopes_growthxnative_prez.jpg", height = 3.5, width = 5)
 
 ```
 
@@ -1351,70 +1389,85 @@ m5 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Nam
 
 m6 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
 
-ICtab(m0,m1,m2,m3,m4,m5,m6)
+m7 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m5 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+ICtab(m0,m1,m2,m3,m4,m5,m6,m7)
 
-mV <- glmer(total_fl_mass_ln ~ Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m7 <- glmer(total_fl_mass_ln ~ 1 + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_native <- glmer(total_fl_mass_ln ~ Native_Status*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+mV <- glmer(total_fl_mass_ln ~ Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_rating <- glmer(total_fl_mass_ln ~ Rating*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_native <- glmer(total_fl_mass_ln ~ Native_Status*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_growth <- glmer(total_fl_mass_ln ~ Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_rating <- glmer(total_fl_mass_ln ~ Rating*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_precip <- glmer(total_fl_mass_ln ~ Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_growth <- glmer(total_fl_mass_ln ~ Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_pdif <- glmer(total_fl_mass_ln ~ precip_dif*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_rating.n <- glmer(total_fl_mass_ln ~ rating.n*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_rating.n <- glmer(total_fl_mass_ln ~ rating.n*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_growth2 <- glmer(total_fl_mass_ln ~ Growth_2*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_nativexgrowth <- glmer(total_fl_mass_ln ~ Native_Status*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_rating2 <- glmer(total_fl_mass_ln ~ Growth_2*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_ratingxgrowth <- glmer(total_fl_mass_ln ~ Rating*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_nativexgrowth <- glmer(total_fl_mass_ln ~ Native_Status*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_nativexpop <- glmer(total_fl_mass_ln ~ Native_Status*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_ratingxgrowth <- glmer(total_fl_mass_ln ~ Rating*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_ratingxpop <- glmer(total_fl_mass_ln ~ Rating*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_rating.nxgrowth <- glmer(total_fl_mass_ln ~ rating.n*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_growthxpop <- glmer(total_fl_mass_ln ~ Growth_Habit*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_rating2xgrowth <- glmer(total_fl_mass_ln ~ Rating_2*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_nativexprecip <- glmer(total_fl_mass_ln ~ Native_Status*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_rating2xgrowth2 <- glmer(total_fl_mass_ln ~ Rating_2*Growth_2*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_ratingxprecip <- glmer(total_fl_mass_ln ~ Rating*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_nativexgrowth2 <- glmer(total_fl_mass_ln ~ Native_Status*Growth_2*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_growthxprecip <- glmer(total_fl_mass_ln ~ Growth_Habit*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_nativepgrowth <- glmer(total_fl_mass_ln ~ Native_Status + Growth_Habit + Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_rating.nxpop <- glmer(total_fl_mass_ln ~ rating.n*Population*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_nativep <- glmer(total_fl_mass_ln ~ Native_Status + Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_rating.nxgrowth <- glmer(total_fl_mass_ln ~ rating.n*Growth_Habit*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+m_growthp <- glmer(total_fl_mass_ln ~ Growth_Habit + Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name) + (1|Population), family = gaussian, data = repro_fill_hi_n_narm)
 
-m_rating.nxprecip <- glmer(total_fl_mass_ln ~ rating.n*Precip_mm*Veg_Mass_ln + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_fill_hi_n_narm)
+# add in three way growth habit and three way native
 
-
-ICtab(m5
+ICtab(m7
       ,mV
       ,m_native
       ,m_rating
       ,m_growth
-      ,m_growthxpop
-      ,m_growthxprecip
-      ,m_nativexgrowth
-      ,m_nativexpop
-      ,m_nativexprecip
-      ,m_pdif
-      ,m_precip
-      ,m_ratingxgrowth
-      ,m_ratingxpop
-      ,m_ratingxprecip
       ,m_rating.n
+      ,m_growth2
+      ,m_rating2
+      ,m_nativexgrowth
+      ,m_ratingxgrowth
       ,m_rating.nxgrowth
-      ,m_rating.nxpop
-      ,m_rating.nxprecip)
-lrtest(m_growth, m5)
+      ,m_rating2xgrowth
+      ,m_rating2xgrowth2
+      ,m_nativexgrowth2
+      ,m_nativepgrowth
+      ,m_nativep
+      ,m_growthp)
+anova(m_growth, mV)
 Anova(m_growth)
 summary(m_growth)
 #mall
+
+slopes <- emtrends(m_growth, ~ Growth_Habit, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+ggplot(slopes.df, aes(x = Growth_Habit, y = Veg_Mass_ln.trend
+                      )) + 
+  geom_bar(position = position_dodge(), stat = "identity", fill = "#21908CFF") +
+  # geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_errorbar(aes(ymin=Veg_Mass_ln.trend-SE, ymax=Veg_Mass_ln.trend+SE), width=0.3, colour="#FDE725FF", alpha=0.9, size=1.3, position = position_dodge(0.9)) +
+  theme_classic() +
+  labs(x = "Growth Habit",
+       y = "VR Slope",
+       fill = "")
+
+ggsave("slopes_growth_pred.jpg")
+
 
 # Check assumptions
 
@@ -1588,9 +1641,16 @@ ICtab(m5
 
 # m_spei_p_xnative, m_spei_p_xgrowth are the best. The growth/native term is effectively the same because all the grasses are non native and most of the forbs are native
 
-lrtest(m_growth, m5)
-Anova(m_speixnative)
-summary(m_speixgrowth)
+anova(m_spei_p_xgrowth, m5)
+anova(m_spei_p_xgrowth, mV)
+
+slopes <- emtrends(m_spei_p_xgrowth, ~ Growth_Habit + spei_avg, var = "Veg_Mass_ln")
+slopes
+
+slopes.df <- summary(slopes)
+
+
+summary(m_spei_p_xgrowth)
 VarCorr(m_spei_p_xgrowth)
 
 
@@ -1634,6 +1694,115 @@ qqline(resid(m_spei_p_xgrowth))
 
 log(0.1)
 ```
+
+#### Line: SPEI + V*growth
+```{r}
+# the model: m_spei_p_xgrowth <- glmer(total_fl_mass_ln ~ spei_avg+Veg_Mass_ln*Growth_Habit + (1|Block) + (1|Treatment) + (1|Scientific_Name), family = gaussian, data = repro_pop)
+
+summary(repro_pop)
+
+ggplot(repro_pop, aes(x=Veg_Mass_ln, y=total_fl_mass_ln, shape=Growth_Habit, color=spei_avg)) + geom_point() + geom_smooth(method=lm, aes(fill=Growth_Habit))
+
+
+# make a facet with forb and grass with their own facet
+
+ggplot(repro_pop, aes(x=Veg_Mass_ln, y=total_fl_mass_ln, shape=Growth_Habit, color=spei_avg)) + 
+  geom_point() + geom_smooth(method=lm) + facet_grid(~Growth_Habit)
+
+# three lines for three different SPEIs
+repro_pop$Growth_Habit <- factor(repro_pop$Growth_Habit)
+
+spei_vals <- quantile(repro_pop$spei_avg, probs = c(0.1, 0.5, 0.9), na.rm = TRUE)
+
+pred_dat <- expand.grid(
+  Veg_Mass_ln  = seq(min(repro_pop$Veg_Mass_ln, na.rm = TRUE),
+                     max(repro_pop$Veg_Mass_ln, na.rm = TRUE),
+                     length.out = 100),
+  spei_avg     = spei_vals,
+  Growth_Habit = levels(repro_pop$Growth_Habit)
+)
+
+pred_dat$pred_repro_mass <- predict(
+  m_spei_p_xgrowth,
+  newdata = pred_dat,
+  re.form = NA,
+  type = "response"
+)
+
+library(ggplot2)
+
+str(pred_dat)
+
+pred_dat <- pred_dat %>%
+  mutate(
+    spei_f = factor(
+      spei_avg,
+      labels = c("Low SPEI", "Median SPEI", "High SPEI")
+    )
+  )
+
+ggplot(pred_dat,
+       aes(x = Veg_Mass_ln,
+           y = pred_repro_mass,
+           color = spei_f)) +
+  geom_line(linewidth = 1.1) +
+  facet_wrap(~ Growth_Habit) +
+  labs(
+    x = "Vegetative Mass (ln)",
+    y = "Predicted Reproductive Mass (ln)",
+    color = "SPEI level"
+  ) +
+  theme_classic() +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+ggplot() +
+  ## raw points (colored by continuous SPEI)
+  geom_point(
+    data = repro_pop,
+    aes(
+      x = Veg_Mass_ln,
+      y = total_fl_mass_ln,
+      color = spei_avg
+    ),
+    alpha = 0.75,
+    size = 1
+  ) +
+  ## prediction lines (same color scale!)
+  geom_line(
+    data = pred_dat,
+    aes(
+      x = Veg_Mass_ln,
+      y = pred_repro_mass,
+      color = spei_avg,
+      group = spei_avg
+    ),
+    linewidth = 1.2
+  ) +
+  facet_wrap(~ Growth_Habit) +
+  scale_color_viridis_c(name = "SPEI") +
+  labs(
+    x = "Vegetative Mass (ln)",
+    y = "Reproductive Mass (ln)"
+  ) +
+  theme_classic() +
+    theme(
+    legend.title = element_text(size=12,face="bold"),
+    legend.text =element_text(size=12, colour="black"),
+    axis.text=element_text(size=12, colour="black"),
+    axis.title=element_text(size=12,face="bold"),
+    plot.margin = unit(c(0.25,0.25,0.25,0.75), "cm"),
+    strip.text = element_text(face="bold", size=12),
+    panel.spacing = unit(2, "lines")
+  )
+
+ggsave("SPEIxgrowth_prez.jpg", height = 3.5, width = 7)
+
+```
+
+
 
 
 ### Analysis and Diving Deeper
@@ -2484,7 +2653,6 @@ head(plots)
 
 spp <- read_csv("Species Codes copy.csv")
 unique(spp$Sp_Code)
-unique(repro$Species)
 
 # need to pull out first two characters in string of plant ID to create a "plot" column
 
@@ -3307,10 +3475,9 @@ repro <- repro_fill_hi_n_narm %>%
   select(
     Plant_ID,
     Flower_Count,
+    fl_average,
     Veg_Mass,
-    total_fl_mass,
-    Veg_Mass_ln,
-    total_fl_mass_ln
+    total_fl_mass
   ) %>% 
   mutate(
     repro_allo = total_fl_mass/(Veg_Mass + total_fl_mass),
@@ -3335,8 +3502,6 @@ licor <- licor5 %>%
     Plant_ID,
     A_adj_av,
     WUE_adj_av,
-    E_adj_av,
-    Ci_adj_av,
     gsw_adj_av
   ) %>% 
   mutate(
@@ -3437,6 +3602,24 @@ summary(pca)
 # View loadings
 pca$rotation
 
+loadings_pc1 <- pca$rotation[, 1]
+loadings_pc1
+sort(abs(loadings_pc1), decreasing = TRUE)
+contrib_pc1 <- loadings_pc1^2
+sort(contrib_pc1, decreasing = TRUE)
+
+loadings_pc2 <- pca$rotation[, 2]
+loadings_pc2
+contrib_pc2 <- loadings_pc2^2
+sort(contrib_pc2, decreasing = TRUE)
+
+loadings_pc3 <- pca$rotation[, 3]
+loadings_pc3
+contrib_pc3 <- loadings_pc3^2
+sort(contrib_pc3, decreasing = TRUE)
+
+
+1/17
 biplot(pca)
 
 pca_scores <- as.data.frame(pca$x)
@@ -3463,6 +3646,10 @@ ggbiplot(pca, groups = pca_scores_2$Native_Status, ellipse = TRUE, circle = TRUE
 ggsave("pca_native.jpg")
 
 ggbiplot(pca, groups = pca_scores_2$Growth_Habit, ellipse = TRUE, circle = TRUE) +
+  scale_color_discrete(name = "") +
+  theme_minimal()
+
+ggbiplot(pca, groups = pca_scores_2$Growth2, ellipse = TRUE, circle = TRUE) +
   scale_color_discrete(name = "") +
   theme_minimal()
 
